@@ -507,3 +507,4 @@ samples/SampleGame.Embedded/mods/**/*.dll
 samples/SampleGame.Embedded/mods/**/*.deps.json
 samples/SampleGame.Embedded/.godot/
 samples/SampleGame.Embedded/mods/**/*.pck
+samples/SampleGame.Embedded/build/
