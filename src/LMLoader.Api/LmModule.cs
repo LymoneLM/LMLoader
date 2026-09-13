@@ -21,6 +21,10 @@ public abstract class LmModule
 	/// <summary>per-mod logger 便捷入口。</summary>
 	protected ILmLogger Logger => Context.Logger;
 
+	/// <summary>模组配置便捷入口(D11);加载器未提供配置系统时抛错。</summary>
+	protected Config.ModConfig Config =>
+		Context.Config ?? throw new InvalidOperationException("当前加载器未提供配置系统,无法绑定配置项");
+
 	/// <summary>
 	/// 发布跨模组服务(D4 弱类型通道):以本模块 UID 为所有者注册。
 	/// 建议在 OnPreLoad/OnLoad 发布、在 OnPostLoad 消费(PostLoad 阶段全部模块已完成注册)。

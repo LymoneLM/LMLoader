@@ -2,6 +2,7 @@
 
 using System.Reflection;
 using LMLoader.Api;
+using LMLoader.Api.Config;
 using LMLoader.Core.Dependency;
 using LMLoader.Core.Loading;
 using LMLoader.Core.Logging;
@@ -212,12 +213,14 @@ public sealed class LifecycleRunner
 		var instance = (LmModule)(Activator.CreateInstance(type) ?? throw new MissingMemberException(
 			$"类型 \"{state.Item.Module.Type}\" 缺少公共无参构造函数"));
 
-			instance.Attach(new LmModuleContext(
+		state.Config = new ModConfig(); // 4.3:PreLoad 后按 D11 合并磁盘配置
+		instance.Attach(new LmModuleContext(
 			state.Item.ModuleUid,
 			state.Item.ModUid,
 			state.Item.Mod.Directory,
 			_loggerRouter.GetLogger(state.Item.ModUid),
-			_serviceRegistry));
+			_serviceRegistry,
+			state.Config));
 
 		return instance;
 	}
@@ -276,6 +279,9 @@ public sealed class LifecycleRunner
 		public ModulePlanItem Item { get; }
 
 		public LmModule? Instance { get; set; }
+
+		/// <summary>模块配置声明面(D11);实例化时创建,4.3 起在 PreLoad 后合并磁盘值。</summary>
+		public Api.Config.ModConfig? Config { get; set; }
 
 		public LifecycleStage CurrentStage { get; set; } = LifecycleStage.AssemblyLoad;
 
