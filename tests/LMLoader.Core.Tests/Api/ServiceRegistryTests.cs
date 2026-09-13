@@ -24,7 +24,7 @@ public class ServiceRegistryTests
 	{
 		var registry = new ServiceRegistry();
 
-		registry.Register("com.a.mod", new GreeterA());
+		registry.Register<IGreeter>("com.a.mod", new GreeterA());
 
 		Assert.True(registry.TryGet<IGreeter>(out var service));
 		Assert.Equal("A", service.Greet());
@@ -44,8 +44,8 @@ public class ServiceRegistryTests
 	{
 		var registry = new ServiceRegistry();
 
-		registry.Register("com.a.mod", new GreeterA());
-		registry.Register("com.b.mod", new GreeterB());
+		registry.Register<IGreeter>("com.a.mod", new GreeterA());
+		registry.Register<IGreeter>("com.b.mod", new GreeterB());
 
 		Assert.True(registry.TryGet<IGreeter>(out var service));
 		Assert.Equal("B", service.Greet());
@@ -56,8 +56,8 @@ public class ServiceRegistryTests
 	{
 		var registry = new ServiceRegistry();
 
-		registry.Register("com.a.mod", new GreeterA());
-		registry.Register("com.a.mod", new GreeterB());
+		registry.Register<IGreeter>("com.a.mod", new GreeterA());
+		registry.Register<IGreeter>("com.a.mod", new GreeterB());
 
 		Assert.True(registry.TryGet<IGreeter>(out var latest));
 		Assert.Equal("B", latest.Greet());
@@ -69,8 +69,8 @@ public class ServiceRegistryTests
 	{
 		var registry = new ServiceRegistry();
 
-		registry.Register("com.a.mod", new GreeterA());
-		registry.Register("com.b.mod", new GreeterB());
+		registry.Register<IGreeter>("com.a.mod", new GreeterA());
+		registry.Register<IGreeter>("com.b.mod", new GreeterB());
 
 		Assert.True(registry.TryGet<IGreeter>("com.a.mod", out var a));
 		Assert.Equal("A", a.Greet());
@@ -84,23 +84,26 @@ public class ServiceRegistryTests
 	{
 		var registry = new ServiceRegistry();
 
-		registry.Register("com.b.mod", new GreeterB());
-		registry.Register("com.a.mod", new GreeterA());
+		registry.Register<IGreeter>("com.b.mod", new GreeterB());
+		registry.Register<IGreeter>("com.a.mod", new GreeterA());
 
 		Assert.Equal(["B", "A"], registry.GetAll<IGreeter>().Select(g => g.Greet()));
 	}
 
 	[Fact]
-	public void 具体类型与接口类型按声明类型分别成键()
+	public void 键为调用处声明的泛型类型()
 	{
 		var registry = new ServiceRegistry();
-		var greeter = new GreeterA();
 
-		registry.Register("com.a.mod", greeter);
+		IGreeter asInterface = new GreeterA();
+		registry.Register("com.a.mod", asInterface); // 泛型推断:T = IGreeter
 
 		Assert.True(registry.TryGet<IGreeter>(out _));
-		Assert.True(registry.TryGet<GreeterA>(out _));
-		Assert.False(registry.TryGet<GreeterB>(out _));
+		Assert.False(registry.TryGet<GreeterA>(out _)); // 未按具体类型注册过
+
+		registry.Register("com.b.mod", new GreeterB()); // 泛型推断:T = GreeterB
+
+		Assert.True(registry.TryGet<GreeterB>(out _));
 	}
 
 	[Fact]
