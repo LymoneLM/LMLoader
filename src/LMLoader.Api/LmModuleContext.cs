@@ -7,12 +7,13 @@ namespace LMLoader.Api;
 /// </summary>
 public sealed class LmModuleContext
 {
-	public LmModuleContext(string moduleUid, string modUid, string modDirectory, ILmLogger logger)
+	public LmModuleContext(string moduleUid, string modUid, string modDirectory, ILmLogger logger, ServiceRegistry? services = null)
 	{
 		ModuleUid = moduleUid ?? throw new ArgumentNullException(nameof(moduleUid));
 		ModUid = modUid ?? throw new ArgumentNullException(nameof(modUid));
 		ModDirectory = modDirectory ?? throw new ArgumentNullException(nameof(modDirectory));
 		Logger = logger ?? throw new ArgumentNullException(nameof(logger));
+		Services = services;
 	}
 
 	/// <summary>模块唯一标识(mod.json 中该模块的 uid)。</summary>
@@ -26,4 +27,7 @@ public sealed class LmModuleContext
 
 	/// <summary>per-mod logger(输出按模组划分,D6)。</summary>
 	public ILmLogger Logger { get; }
+
+	/// <summary>跨模组服务注册表(D4);加载器未提供时为 null(模块侧 Publish 将抛错)。</summary>
+	public ServiceRegistry? Services { get; }
 }

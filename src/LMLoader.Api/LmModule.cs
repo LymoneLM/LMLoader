@@ -21,6 +21,30 @@ public abstract class LmModule
 	/// <summary>per-mod logger 便捷入口。</summary>
 	protected ILmLogger Logger => Context.Logger;
 
+	/// <summary>
+	/// 发布跨模组服务(D4 弱类型通道):以本模块 UID 为所有者注册。
+	/// 建议在 OnPreLoad/OnLoad 发布、在 OnPostLoad 消费(PostLoad 阶段全部模块已完成注册)。
+	/// </summary>
+	protected void PublishService<T>(T instance) where T : class
+	{
+		var registry = Context.Services
+			?? throw new InvalidOperationException("当前加载器未提供服务注册表,无法发布跨模组服务");
+		registry.Register(Context.ModuleUid, instance);
+	}
+
+	/// <summary>取回最后注册的该类型跨模组服务(D4);不存在返回 false。</summary>
+	protected bool TryGetService<T>(out T instance) where T : class
+	{
+		var registry = Context.Services;
+		if (registry is null)
+		{
+			instance = default!;
+			return false;
+		}
+
+		return registry.TryGet(out instance);
+	}
+
 	/// <summary>由加载器调用;模组作者不要调用。</summary>
 	internal void Attach(LmModuleContext context)
 	{

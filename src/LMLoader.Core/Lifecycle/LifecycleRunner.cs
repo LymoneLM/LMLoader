@@ -25,12 +25,18 @@ public sealed class LifecycleRunner
 
 	private readonly ModAssemblyLoader _assemblyLoader;
 	private readonly LoggerRouter _loggerRouter;
+	private readonly ServiceRegistry? _serviceRegistry;
 	private readonly bool _strict;
 
-	public LifecycleRunner(ModAssemblyLoader assemblyLoader, LoggerRouter loggerRouter, bool strict = false)
+	public LifecycleRunner(
+		ModAssemblyLoader assemblyLoader,
+		LoggerRouter loggerRouter,
+		bool strict = false,
+		ServiceRegistry? serviceRegistry = null)
 	{
 		_assemblyLoader = assemblyLoader ?? throw new ArgumentNullException(nameof(assemblyLoader));
 		_loggerRouter = loggerRouter ?? throw new ArgumentNullException(nameof(loggerRouter));
+		_serviceRegistry = serviceRegistry;
 		_strict = strict;
 	}
 
@@ -206,11 +212,12 @@ public sealed class LifecycleRunner
 		var instance = (LmModule)(Activator.CreateInstance(type) ?? throw new MissingMemberException(
 			$"类型 \"{state.Item.Module.Type}\" 缺少公共无参构造函数"));
 
-		instance.Attach(new LmModuleContext(
+			instance.Attach(new LmModuleContext(
 			state.Item.ModuleUid,
 			state.Item.ModUid,
 			state.Item.Mod.Directory,
-			_loggerRouter.GetLogger(state.Item.ModUid)));
+			_loggerRouter.GetLogger(state.Item.ModUid),
+			_serviceRegistry));
 
 		return instance;
 	}
