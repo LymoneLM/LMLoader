@@ -1,0 +1,16 @@
+{
+  "schemaVersion": 1,
+  "uid": "com.lmloader.sample",
+  "name": "样例模组",
+  "version": "1.0.0",
+  "authors": ["LymoneLM"],
+  "description": "LMLoader 样例模组:演示清单、服务发布与日志",
+  "gameId": "com.lmloader.samplegame",
+  "loaderVersion": "1.0.0",
+  "entry": {
+    "assembly": "SampleMod.dll",
+    "modules": [
+      { "uid": "com.lmloader.sample.main", "type": "Sample.SampleModule" }
+    ]
+  }
+}

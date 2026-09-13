@@ -1,0 +1,13 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- 样例模组:构建产物直接落到样例游戏的 mods 目录(含 dll 与 deps.json) -->
+  <PropertyGroup>
+    <OutputPath>..\..\SampleGame.Embedded\mods\com.lmloader.sample\</OutputPath>
+    <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\..\src\LMLoader.Api\LMLoader.Api.csproj" />
+  </ItemGroup>
+
+</Project>

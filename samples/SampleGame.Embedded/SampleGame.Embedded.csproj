@@ -1,0 +1,17 @@
+<Project Sdk="Godot.NET.Sdk/4.7.2">
+
+  <!-- 样例游戏:内嵌版接入演示;Godot.NET.Sdk 版本与 spike 基线一致 -->
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <EnableDynamicLoading>true</EnableDynamicLoading>
+    <!-- Godot 源生成器产物与模板代码不适用警告即错误,样例单独放宽 -->
+    <TreatWarningsAsErrors>false</TreatWarningsAsErrors>
+    <!-- Godot.NET.Sdk 隐式引用 GodotSharp(自带版本),与仓库 CPM 冲突(NU1009),样例退出 CPM -->
+    <ManagePackageVersionsCentrally>false</ManagePackageVersionsCentrally>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\LMLoader.Embedded\LMLoader.Embedded.csproj" />
+  </ItemGroup>
+
+</Project>

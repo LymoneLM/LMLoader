@@ -41,8 +41,33 @@ public partial class LMLoaderAutoload : Node
 	public ServiceRegistry? Services => _modManager?.Services;
 
 	private Node? _modsMountRoot;
+	private bool _booted;
 
-	public override void _Ready()
+	/// <summary>
+	/// 引导流程结束(成功、部分失败或无 mods 目录跳过);经 <see cref="LastLoadResult"/> 取结果
+	/// (无 mods 目录时为 null)。
+	/// </summary>
+	public event Action? BootCompleted;
+
+	public override void _Ready() => RunBoot();
+
+	/// <summary>
+	/// 执行引导(幂等)。同步入树时由 <see cref="LMLoader.Embedded.LMLoaderEmbedded.Initialize"/> 立即调用;
+	/// 延迟入树时经 CallDeferred 调用(实测 Godot 4.7.2 中,启动期延迟入树的节点不触发 _Ready,
+	/// 故 _Ready 仅作项目 Autoload 注册路径的兜底入口)。
+	/// </summary>
+	public void RunBoot()
+	{
+		if (_booted)
+		{
+			return;
+		}
+
+		_booted = true;
+		Boot();
+	}
+
+	private void Boot()
 	{
 		Instance = this;
 		Name = "LMLoader"; // 固定挂载点树根名(D5):/root/LMLoader/Mods/<modUid>
@@ -61,6 +86,7 @@ public partial class LMLoaderAutoload : Node
 		{
 			// 游戏未携带 mods 目录属正常形态,不视为错误
 			logger.Info($"mods 目录不存在({modsRoot}),跳过模组加载");
+			BootCompleted?.Invoke();
 			return;
 		}
 
@@ -74,6 +100,7 @@ public partial class LMLoaderAutoload : Node
 
 		LastLoadResult = _modManager.LoadAll();
 		BuildMountPoints(LastLoadResult);
+		BootCompleted?.Invoke();
 	}
 
 	public override void _ExitTree()
@@ -86,7 +113,12 @@ public partial class LMLoaderAutoload : Node
 	}
 
 	/// <summary>取模组私有挂载点(D5);模组加载成功后可用,否则 null。</summary>
-	public Node? GetModMountPoint(string modUid) => _modsMountRoot?.GetNodeOrNull(modUid);
+	public Node? GetModMountPoint(string modUid) =>
+		_modsMountRoot?.GetNodeOrNull(SanitizeNodeName(modUid));
+
+	/// <summary>Godot 节点名禁止 . : @ / " % 等字符,统一替换为下划线。</summary>
+	private static string SanitizeNodeName(string name) =>
+		new string(name.Select(c => c is '.' or ':' or '@' or '/' or '"' or '%' ? '_' : c).ToArray());
 
 	private void BuildMountPoints(LoadResult result)
 	{
@@ -103,7 +135,7 @@ public partial class LMLoaderAutoload : Node
 			.Select(r => r.ModUid)
 			.Distinct(StringComparer.Ordinal))
 		{
-			_modsMountRoot.AddChild(new Node { Name = modUid });
+			_modsMountRoot.AddChild(new Node { Name = SanitizeNodeName(modUid) });
 		}
 	}
 }

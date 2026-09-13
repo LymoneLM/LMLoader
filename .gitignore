@@ -501,3 +501,8 @@ GEMINI.md
 # Godot 4(Godot 缓存目录;模组源码目录的 .gdignore 是标记文件,需入库)
 .godot/
 *.translation
+
+# 样例工程:构建产物不入库(mod.json 清单是源文件,保留)
+samples/SampleGame.Embedded/mods/**/*.dll
+samples/SampleGame.Embedded/mods/**/*.deps.json
+samples/SampleGame.Embedded/.godot/

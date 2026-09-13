@@ -1,0 +1,14 @@
+; Engine configuration file.
+; LMLoader 内嵌版样例游戏(M2 里程碑验证工程)
+
+config_version=5
+
+[application]
+
+config/name="SampleGame.Embedded"
+run/main_scene="res://Main.tscn"
+config/features=PackedStringArray("4.7", "C#")
+
+[dotnet]
+
+project/assembly_name="SampleGame.Embedded"
