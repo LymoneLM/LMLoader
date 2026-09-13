@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: LGPL-3.0-or-later
 
 using Godot;
+using LMLoader.Api;
 using LMLoader.Embedded;
 
 namespace SampleGame;
@@ -83,27 +84,113 @@ public partial class Main : Node
 			// 任务 3.4:模组 patch 验证——静态方法 prefix 改写(原语义应为 3)
 			if (Add(1, 2) != 100)
 			{
-				GD.PrintErr("LMLOADER-SMOKE-FAIL");
-				GD.PrintErr("静态方法 patch 未生效");
-				GetTree().Quit(1);
+				SmokeFail("静态方法 patch 未生效");
 				return;
 			}
 
-			// 引擎 native→managed 路径:_Process 由引擎每帧调用,postfix 计数应持续增长
-			GetTree().CreateTimer(0.5).Timeout += () =>
+			// ---- M4:配置系统(D11) ----
+			if (loader.Configs is null)
 			{
-				if (ProcessPatchHits == 0)
+				SmokeFail("配置系统未启用(user://configs)");
+				return;
+			}
+
+			if (loader.LogBuffer is null || loader.LogBuffer.Snapshot().Length == 0)
+			{
+				SmokeFail("内存环形日志缓冲为空(D6)");
+				return;
+			}
+
+			// 首次运行:缺失键应已按默认值写回 user://configs/com.lmloader.sample.toml
+			if (!Godot.FileAccess.FileExists("user://configs/com.lmloader.sample.toml"))
+			{
+				SmokeFail("配置默认值未写回(D11)");
+				return;
+			}
+
+			// 任务 4.6:日志窗口——渲染环形缓冲 + 分级过滤(不入树,直接断言)
+			var window = new LMLoader.UI.LmLogWindow(loader.LogBuffer);
+			window.Refresh();
+			if (!window.LogText.Contains("[LMLoader]"))
+			{
+				SmokeFail("日志窗口未渲染出 loader 日志");
+				return;
+			}
+
+			window.SetMinimumLevel(LmLogLevel.Error);
+			window.Refresh();
+			if (window.LogText.Contains("[INFO]"))
+			{
+				SmokeFail("日志窗口分级过滤未生效");
+				return;
+			}
+			window.QueueFree();
+
+			// 任务 4.4:热重载引擎链验证——先把配置归一到默认(幂等,消除上次运行遗留),
+			// 再改值 250,防抖后 Add 应跟踪变化
+			if (!WriteSampleConfig(100))
+			{
+				SmokeFail("配置文件写入失败");
+				return;
+			}
+
+			GetTree().CreateTimer(1.5).Timeout += () =>
+			{
+				if (Add(1, 2) != 100)
 				{
-					GD.PrintErr("LMLOADER-SMOKE-FAIL");
-					GD.PrintErr("_Process postfix 未命中(native→managed)");
-					GetTree().Quit(1);
+					SmokeFail($"配置热重载(归一到默认)未生效:Add={Add(1, 2)}");
 					return;
 				}
 
-				GD.Print($"LMLOADER-SMOKE-PASS (patch hits: {ProcessPatchHits})");
-				GD.Print(result.SummaryText);
-				GetTree().Quit(0);
+				if (!WriteSampleConfig(250))
+				{
+					SmokeFail("配置文件写入失败");
+					return;
+				}
+
+				GetTree().CreateTimer(1.5).Timeout += () =>
+				{
+					if (Add(1, 2) != 250)
+					{
+						SmokeFail($"配置热重载未生效:Add={Add(1, 2)}(期望 250)");
+						return;
+					}
+
+					// 引擎 native→managed 路径:_Process 由引擎每帧调用,postfix 计数应持续增长
+					GetTree().CreateTimer(0.5).Timeout += () =>
+					{
+						if (ProcessPatchHits == 0)
+						{
+							SmokeFail("_Process postfix 未命中(native→managed)");
+							return;
+						}
+
+						GD.Print($"LMLOADER-SMOKE-PASS (patch hits: {ProcessPatchHits})");
+						GD.Print(result.SummaryText);
+						GetTree().Quit(0);
+					};
+				};
 			};
 		};
+	}
+
+	private void SmokeFail(string reason)
+	{
+		GD.PrintErr("LMLOADER-SMOKE-FAIL");
+		GD.PrintErr(reason);
+		GetTree().Quit(1);
+	}
+
+	private static bool WriteSampleConfig(int multiplier)
+	{
+		using var file = Godot.FileAccess.Open(
+			"user://configs/com.lmloader.sample.toml", Godot.FileAccess.ModeFlags.Write);
+		if (file is null)
+		{
+			return false;
+		}
+
+		file.StoreString($"[Patch]\nMultiplier = {multiplier}\n");
+		return true;
 	}
 }

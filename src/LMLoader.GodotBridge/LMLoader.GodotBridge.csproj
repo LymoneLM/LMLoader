@@ -8,6 +8,7 @@
   <ItemGroup>
     <ProjectReference Include="..\LMLoader.Api\LMLoader.Api.csproj" />
     <ProjectReference Include="..\LMLoader.Core\LMLoader.Core.csproj" />
+    <ProjectReference Include="..\LMLoader.UI\LMLoader.UI.csproj" />
   </ItemGroup>
 
 </Project>

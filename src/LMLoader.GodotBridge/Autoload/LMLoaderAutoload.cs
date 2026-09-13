@@ -47,8 +47,17 @@ public partial class LMLoaderAutoload : Node
 	/// <summary>跨模组服务注册表(D4)。</summary>
 	public ServiceRegistry? Services => _modManager?.Services;
 
+	/// <summary>内存环形日志缓冲(D6);日志窗口数据源,宿主可另接 UI。</summary>
+	public RingBufferLogSink? LogBuffer => _logBuffer;
+
+	/// <summary>配置协调器(D11);未引导或未启用配置时为 null(热重载已随引导开启)。</summary>
+	public LMLoader.Core.Config.ConfigManager? Configs => _modManager?.Configs;
+
 	private Node? _modsMountRoot;
 	private bool _booted;
+	private RingBufferLogSink? _logBuffer;
+	private LMLoader.UI.LmLogWindow? _logWindow;
+	private string? _summaryForWindow;
 
 	/// <summary>
 	/// 引导流程结束(成功、部分失败或无 mods 目录跳过);经 <see cref="LastLoadResult"/> 取结果
@@ -79,8 +88,13 @@ public partial class LMLoaderAutoload : Node
 		Instance = this;
 		Name = "LMLoader"; // 固定挂载点树根名(D5):/root/LMLoader/Mods/<modUid>
 
-		var router = new LoggerRouter { MinimumLevel = LmLogLevel.Info };
+		// D6:Godot 控制台 + 内存环形缓冲(日志窗口) + 文件(user://logs);级别 Debug 便于模组排障
+		var router = new LoggerRouter { MinimumLevel = LmLogLevel.Debug };
 		router.AddSink(new GodotLogSink());
+		_logBuffer = new RingBufferLogSink();
+		router.AddSink(_logBuffer);
+		router.AddSink(new FileLogSink(
+			ProjectSettings.GlobalizePath("user://logs/LMLoader.log"), append: true));
 		var logger = router.GetLogger(LifecycleRunner.LoaderLogUid);
 
 		LmScene.Attach(GetTree());
@@ -104,16 +118,51 @@ public partial class LMLoaderAutoload : Node
 			ApiVersion = ApiVersion,
 			GameAssemblyResolver = GameAssemblyResolver,
 			AfterPlan = plan => PckMounter.MountInPlanOrder(plan, logger),
+			ConfigRootPath = ProjectSettings.GlobalizePath("user://configs"), // D11 硬约束:Steam 环境游戏目录不可写
 		}, router);
 
 		LastLoadResult = _modManager.LoadAll();
+		_summaryForWindow = LastLoadResult.SummaryText;
+		_modManager.Configs?.StartHotReload(); // 4.4:配置改文件即生效
 		BuildMountPoints(LastLoadResult);
 		BootCompleted?.Invoke();
+	}
+
+	public override void _UnhandledKeyInput(InputEvent @event)
+	{
+		// F12 切换日志窗口(可选组件,4.6)
+		if (@event is InputEventKey { Pressed: true, Keycode: Key.F12 })
+		{
+			OpenLogWindow();
+		}
+	}
+
+	/// <summary>打开或切换日志窗口(分级查看 + 加载汇总报告);数据源为本 loader 的环形缓冲。</summary>
+	public void OpenLogWindow()
+	{
+		if (_logWindow is not null)
+		{
+			_logWindow.Visible = !_logWindow.Visible;
+			return;
+		}
+
+		if (_logBuffer is null)
+		{
+			return; // 未引导(未入树),无数据源
+		}
+
+		_logWindow = new LMLoader.UI.LmLogWindow(_logBuffer);
+		AddChild(_logWindow);
+		if (_summaryForWindow is not null)
+		{
+			_logWindow.ShowLoadSummary(_summaryForWindow);
+		}
 	}
 
 	public override void _ExitTree()
 	{
 		LmScene.Detach();
+		_modManager?.Dispose();
 		if (ReferenceEquals(Instance, this))
 		{
 			Instance = null;
