@@ -28,7 +28,8 @@ public class SampleModule : LmModule
 		PublishService<IClockService>(new ClockService());
 
 		// 任务 3.4:patch 游戏静态方法与引擎逐帧调用的 _Process(native→managed)
-		var patcher = Patcher ?? throw new InvalidOperationException("加载器未提供 per-mod Patcher");
+		// HarmonyX 由模组自带(D1 修订):per-mod 实例约定 id = 模组 uid
+		var patcher = new Harmony(Uid);
 		patcher.Patch(
 			typeof(SampleGame.Main).GetMethod(nameof(SampleGame.Main.Add))!,
 			prefix: new HarmonyMethod(typeof(SampleModule).GetMethod(nameof(AddPrefix), BindingFlags.NonPublic | BindingFlags.Static)!));

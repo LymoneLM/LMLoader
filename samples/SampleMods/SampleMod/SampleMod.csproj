@@ -4,6 +4,7 @@
   <PropertyGroup>
     <OutputPath>..\..\SampleGame.Embedded\mods\com.lmloader.sample\</OutputPath>
     <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
+    <CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies>
   </PropertyGroup>
 
   <ItemGroup>

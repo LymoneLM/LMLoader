@@ -26,20 +26,17 @@ public sealed class LifecycleRunner
 	private readonly ModAssemblyLoader _assemblyLoader;
 	private readonly LoggerRouter _loggerRouter;
 	private readonly ServiceRegistry? _serviceRegistry;
-	private readonly Patching.PatchManager? _patchManager;
 	private readonly bool _strict;
 
 	public LifecycleRunner(
 		ModAssemblyLoader assemblyLoader,
 		LoggerRouter loggerRouter,
 		bool strict = false,
-		ServiceRegistry? serviceRegistry = null,
-		Patching.PatchManager? patchManager = null)
+		ServiceRegistry? serviceRegistry = null)
 	{
 		_assemblyLoader = assemblyLoader ?? throw new ArgumentNullException(nameof(assemblyLoader));
 		_loggerRouter = loggerRouter ?? throw new ArgumentNullException(nameof(loggerRouter));
 		_serviceRegistry = serviceRegistry;
-		_patchManager = patchManager;
 		_strict = strict;
 	}
 
@@ -220,8 +217,7 @@ public sealed class LifecycleRunner
 			state.Item.ModUid,
 			state.Item.Mod.Directory,
 			_loggerRouter.GetLogger(state.Item.ModUid),
-			_serviceRegistry,
-			_patchManager?.GetPatcher(state.Item.ModUid)));
+			_serviceRegistry));
 
 		return instance;
 	}

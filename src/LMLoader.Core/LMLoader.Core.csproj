@@ -5,7 +5,6 @@
     <ProjectReference Include="..\LMLoader.Api\LMLoader.Api.csproj" />
   </ItemGroup>
   <ItemGroup>
-    <PackageReference Include="HarmonyX" />
   </ItemGroup>
   <ItemGroup>
     <InternalsVisibleTo Include="LMLoader.Core.Tests" />

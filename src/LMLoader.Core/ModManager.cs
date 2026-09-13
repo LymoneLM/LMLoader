@@ -8,7 +8,6 @@ using LMLoader.Core.Loading;
 using LMLoader.Core.Logging;
 using LMLoader.Core.Manifest;
 using LMLoader.Core.Reporting;
-using HarmonyLib;
 using LMLoader.Core.Versioning;
 
 namespace LMLoader.Core;
@@ -28,9 +27,6 @@ public sealed class ModManager : IDisposable
 	/// <summary>跨模组服务注册表(D4)。</summary>
 	public ServiceRegistry Services { get; }
 
-	/// <summary>per-mod Harmony 实例管理(3.2)。</summary>
-	public Patching.PatchManager Patcher { get; } = new();
-
 	public ModManager(LoaderOptions options, LoggerRouter? loggerRouter = null, ServiceRegistry? serviceRegistry = null)
 	{
 		ArgumentNullException.ThrowIfNull(options);
@@ -39,12 +35,9 @@ public sealed class ModManager : IDisposable
 		LoggerRouter = loggerRouter ?? new LoggerRouter { MinimumLevel = options.MinimumLogLevel };
 		Services = serviceRegistry ?? new ServiceRegistry();
 
-		// D1:loader 统一供给公共库(Api 必带;HarmonyX 按 SupplyHarmonyX 开关)
+		// D1(修订):loader 供给 LMLoader.Api;HarmonyX 由模组自带(P3-20 实证:
+		// 进游戏依赖闭包会让导出构建的 MonoMod 被默认上下文二次解析,类型身份分裂)
 		var shared = new List<Assembly> { typeof(LmModule).Assembly };
-		if (options.SupplyHarmonyX)
-		{
-			shared.Add(typeof(Harmony).Assembly);
-		}
 		if (options.SharedLibraries is not null)
 		{
 			shared.AddRange(options.SharedLibraries);
@@ -118,7 +111,7 @@ public sealed class ModManager : IDisposable
 		if (!plan.BatchRejected)
 		{
 			_options.AfterPlan?.Invoke(plan);
-			lifecycle = new LifecycleRunner(_assemblyLoader, LoggerRouter, _options.Strict, Services, Patcher).Execute(plan);
+			lifecycle = new LifecycleRunner(_assemblyLoader, LoggerRouter, _options.Strict, Services).Execute(plan);
 		}
 
 		// ---- 6. 人可读汇总 ----

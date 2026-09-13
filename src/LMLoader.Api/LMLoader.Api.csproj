@@ -1,9 +1,6 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
-  <!-- 公共属性见根目录 Directory.Build.props;HarmonyX 为 loader 供给公共库(D1/D12) -->
-  <ItemGroup>
-    <PackageReference Include="HarmonyX" />
-  </ItemGroup>
+  <!-- 公共属性见根目录 Directory.Build.props -->
   <ItemGroup>
     <!-- 模组上下文由 Core 加载器注入;契约测试需走同一条注入路径 -->
     <InternalsVisibleTo Include="LMLoader.Core" />

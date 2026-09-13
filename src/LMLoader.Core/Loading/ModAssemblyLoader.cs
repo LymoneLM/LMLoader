@@ -39,6 +39,12 @@ public sealed class ModAssemblyLoader : IDisposable
 		_gameAssemblyResolver = gameAssemblyResolver;
 		_context = new ModLoadContext(this);
 
+		// P3-20 排障:MonoMod 的动态代理经 Assembly.Load(byte[]) 落入默认上下文,其基类型
+		// (MonoMod.Utils/ILGeneratorProxy)会在默认上下文再解析出一份 MonoMod 分身,
+		// 与真实实例类型身份分裂 → 泛型约束校验失败(仅导出构建触发,Harmony #642)。
+		// 处理器把 detour 链程序集的解析重定向回已加载的真实实例,消除分身。
+		AppDomain.CurrentDomain.AssemblyResolve += ResolveDetourChain;
+
 		if (sharedLibraries is not null)
 		{
 			foreach (var assembly in sharedLibraries)
@@ -113,7 +119,31 @@ public sealed class ModAssemblyLoader : IDisposable
 
 	public void Dispose()
 	{
-		// 非收集式上下文无需卸载;实现 IDisposable 仅为语义完整与未来扩展
+		AppDomain.CurrentDomain.AssemblyResolve -= ResolveDetourChain;
+	}
+
+	private static Assembly? ResolveDetourChain(object? sender, ResolveEventArgs args)
+	{
+		var name = new AssemblyName(args.Name).Name;
+		if (name is null)
+		{
+			return null;
+		}
+
+		// 仅服务 detour 链(HarmonyX/MonoMod/Mono.Cecil);其余走默认探测
+		var isDetourChain =
+			name.StartsWith("MonoMod", StringComparison.Ordinal) ||
+			name.StartsWith("Mono.Cecil", StringComparison.Ordinal) ||
+			name.StartsWith("0Harmony", StringComparison.Ordinal) ||
+			name.StartsWith("HarmonyX", StringComparison.Ordinal);
+
+		if (!isDetourChain)
+		{
+			return null;
+		}
+
+		return AppDomain.CurrentDomain.GetAssemblies()
+			.FirstOrDefault(a => string.Equals(a.GetName().Name, name, StringComparison.Ordinal));
 	}
 
 	/// <summary>

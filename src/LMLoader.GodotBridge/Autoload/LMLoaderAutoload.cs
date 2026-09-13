@@ -41,9 +41,6 @@ public partial class LMLoaderAutoload : Node
 	/// </summary>
 	public Func<AssemblyName, Assembly?>? GameAssemblyResolver { get; set; }
 
-	/// <summary>是否由 loader 供给 HarmonyX(见 LoaderOptions.SupplyHarmonyX)。入树前设置。</summary>
-	public bool SupplyHarmonyX { get; set; } = true;
-
 	/// <summary>最近一次加载结果;未加载(无 mods 目录)时为 null。</summary>
 	public LoadResult? LastLoadResult { get; private set; }
 
@@ -106,7 +103,6 @@ public partial class LMLoaderAutoload : Node
 			GameId = GameId,
 			ApiVersion = ApiVersion,
 			GameAssemblyResolver = GameAssemblyResolver,
-			SupplyHarmonyX = SupplyHarmonyX,
 			AfterPlan = plan => PckMounter.MountInPlanOrder(plan, logger),
 		}, router);
 

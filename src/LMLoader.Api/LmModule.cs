@@ -22,12 +22,6 @@ public abstract class LmModule
 	protected ILmLogger Logger => Context.Logger;
 
 	/// <summary>
-	/// per-mod Harmony 实例(harmony id = 模组 uid);建议仅在 OnLoad 中 patch(D7:patch 异常由 loader 兜底)。
-	/// 注意:避免 patch 泛型方法定义(P0-1 实证不可用)。
-	/// </summary>
-	protected HarmonyLib.Harmony? Patcher => Context.Patcher;
-
-	/// <summary>
 	/// 发布跨模组服务(D4 弱类型通道):以本模块 UID 为所有者注册。
 	/// 建议在 OnPreLoad/OnLoad 发布、在 OnPostLoad 消费(PostLoad 阶段全部模块已完成注册)。
 	/// </summary>
