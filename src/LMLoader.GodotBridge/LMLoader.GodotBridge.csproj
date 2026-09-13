@@ -2,6 +2,10 @@
 
   <!-- 公共属性见根目录 Directory.Build.props;GodotSharp 版本在 Directory.Packages.props(CPM) -->
   <ItemGroup>
+    <PackageReference Include="GodotSharp" />
+  </ItemGroup>
+
+  <ItemGroup>
     <ProjectReference Include="..\LMLoader.Api\LMLoader.Api.csproj" />
     <ProjectReference Include="..\LMLoader.Core\LMLoader.Core.csproj" />
   </ItemGroup>
