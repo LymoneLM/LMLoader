@@ -20,19 +20,9 @@ public sealed class ConsoleLogSink : ILogSink
 
 	public void Emit(LogEvent @event)
 	{
-		var line =
-			$"[{@event.Timestamp.LocalDateTime:HH:mm:ss.fff}] " +
-			$"[{@event.Level.ToString().ToUpperInvariant()}] " +
-			$"[{@event.ModUid}] {@event.Message}";
-
-		if (@event.Exception is not null)
-		{
-			line += Environment.NewLine + @event.Exception;
-		}
-
 		lock (_writer)
 		{
-			_writer.WriteLine(line);
+			_writer.WriteLine(LogTextFormatter.Render(@event, fullDate: false));
 		}
 	}
 }
