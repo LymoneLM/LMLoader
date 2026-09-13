@@ -1,0 +1,13 @@
+; 模组资源打包工程:导出 pck 供样例游戏挂载(任务 2.4,D10 待验证项)
+; 导出命令:godot --headless --path . --export-pack "PCK" ../SampleGame.Embedded/mods/com.lmloader.sample/pack.pck
+
+config_version=5
+
+[application]
+
+config/name="SampleModPack"
+config/features=PackedStringArray("4.7")
+
+[dotnet]
+
+project/assembly_name="SampleModPack"

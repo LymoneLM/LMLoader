@@ -12,5 +12,6 @@
     "modules": [
       { "uid": "com.lmloader.sample.main", "type": "Sample.SampleModule" }
     ]
-  }
+  },
+  "resources": { "pck": ["pack.pck"] }
 }

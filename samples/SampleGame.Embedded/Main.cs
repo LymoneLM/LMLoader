@@ -38,6 +38,34 @@ public partial class Main : Node
 				return;
 			}
 
+			// 任务 2.4:模组 pck 挂载验证(D10)——pck 早于逻辑挂载,资源在此应可访问;
+			// mod_icon.svg 经 Godot 导入(.import 重映射),验证导入产物在宿主挂载后的行为
+			var rawText = Godot.FileAccess.Open("res://mods/com.lmloader.sample/hello.txt", Godot.FileAccess.ModeFlags.Read);
+			if (rawText is null || rawText.GetAsText().Trim() != "hello-from-pck")
+			{
+				GD.PrintErr("LMLOADER-SMOKE-FAIL");
+				GD.PrintErr("pck 内原始文件不可访问");
+				GetTree().Quit(1);
+				return;
+			}
+
+			if (!ResourceLoader.Exists("res://mods/com.lmloader.sample/mod_icon.svg"))
+			{
+				GD.PrintErr("LMLOADER-SMOKE-FAIL");
+				GD.PrintErr("pck 内导入资源(.import 重映射)不可访问");
+				GetTree().Quit(1);
+				return;
+			}
+
+			var texture = ResourceLoader.Load<Texture2D>("res://mods/com.lmloader.sample/mod_icon.svg");
+			if (texture is null)
+			{
+				GD.PrintErr("LMLOADER-SMOKE-FAIL");
+				GD.PrintErr("导入资源加载失败");
+				GetTree().Quit(1);
+				return;
+			}
+
 			GD.Print("LMLOADER-SMOKE-PASS");
 			GD.Print(result.SummaryText);
 			GetTree().Quit(0);
