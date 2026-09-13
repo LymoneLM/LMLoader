@@ -8,6 +8,7 @@ using LMLoader.Core.Loading;
 using LMLoader.Core.Logging;
 using LMLoader.Core.Manifest;
 using LMLoader.Core.Reporting;
+using HarmonyLib;
 using LMLoader.Core.Versioning;
 
 namespace LMLoader.Core;
@@ -35,7 +36,8 @@ public sealed class ModManager : IDisposable
 		LoggerRouter = loggerRouter ?? new LoggerRouter { MinimumLevel = options.MinimumLogLevel };
 		Services = serviceRegistry ?? new ServiceRegistry();
 
-		var shared = new List<Assembly> { typeof(LmModule).Assembly }; // D1:loader 供给 LMLoader.Api
+		// D1:loader 统一供给公共库(Api 与 HarmonyX 必带;模组捆绑副本将被忽略并告警)
+		var shared = new List<Assembly> { typeof(LmModule).Assembly, typeof(Harmony).Assembly };
 		if (options.SharedLibraries is not null)
 		{
 			shared.AddRange(options.SharedLibraries);
