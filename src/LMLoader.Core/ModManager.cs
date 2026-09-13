@@ -28,6 +28,9 @@ public sealed class ModManager : IDisposable
 	/// <summary>跨模组服务注册表(D4)。</summary>
 	public ServiceRegistry Services { get; }
 
+	/// <summary>per-mod Harmony 实例管理(3.2)。</summary>
+	public Patching.PatchManager Patcher { get; } = new();
+
 	public ModManager(LoaderOptions options, LoggerRouter? loggerRouter = null, ServiceRegistry? serviceRegistry = null)
 	{
 		ArgumentNullException.ThrowIfNull(options);
@@ -111,7 +114,7 @@ public sealed class ModManager : IDisposable
 		if (!plan.BatchRejected)
 		{
 			_options.AfterPlan?.Invoke(plan);
-			lifecycle = new LifecycleRunner(_assemblyLoader, LoggerRouter, _options.Strict, Services).Execute(plan);
+			lifecycle = new LifecycleRunner(_assemblyLoader, LoggerRouter, _options.Strict, Services, Patcher).Execute(plan);
 		}
 
 		// ---- 6. 人可读汇总 ----

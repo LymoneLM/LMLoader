@@ -7,13 +7,14 @@ namespace LMLoader.Api;
 /// </summary>
 public sealed class LmModuleContext
 {
-	public LmModuleContext(string moduleUid, string modUid, string modDirectory, ILmLogger logger, ServiceRegistry? services = null)
+	public LmModuleContext(string moduleUid, string modUid, string modDirectory, ILmLogger logger, ServiceRegistry? services = null, HarmonyLib.Harmony? patcher = null)
 	{
 		ModuleUid = moduleUid ?? throw new ArgumentNullException(nameof(moduleUid));
 		ModUid = modUid ?? throw new ArgumentNullException(nameof(modUid));
 		ModDirectory = modDirectory ?? throw new ArgumentNullException(nameof(modDirectory));
 		Logger = logger ?? throw new ArgumentNullException(nameof(logger));
 		Services = services;
+		Patcher = patcher;
 	}
 
 	/// <summary>模块唯一标识(mod.json 中该模块的 uid)。</summary>
@@ -30,4 +31,9 @@ public sealed class LmModuleContext
 
 	/// <summary>跨模组服务注册表(D4);加载器未提供时为 null(模块侧 Publish 将抛错)。</summary>
 	public ServiceRegistry? Services { get; }
+
+	/// <summary>
+	/// per-mod Harmony 实例(harmony id = 模组 uid,决策 D3.2/3.2);加载器未启用 patch 时为 null。
+	/// </summary>
+	public HarmonyLib.Harmony? Patcher { get; }
 }

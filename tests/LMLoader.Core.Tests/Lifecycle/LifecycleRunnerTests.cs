@@ -109,7 +109,7 @@ public class LifecycleRunnerTests : IDisposable
 		var plan = DependencyPlanner.Plan(mods);
 		Assert.False(plan.BatchRejected, "测试用例不应出现循环依赖");
 		using var assemblyLoader = new ModAssemblyLoader(new NullLogger(), [typeof(LmModule).Assembly]);
-		var runner = new LifecycleRunner(assemblyLoader, new LoggerRouter(), strict);
+		var runner = new LifecycleRunner(assemblyLoader, new LoggerRouter(), strict, null, new LMLoader.Core.Patching.PatchManager());
 		return runner.Execute(plan);
 	}
 
@@ -292,6 +292,20 @@ public class LifecycleRunnerTests : IDisposable
 		var calls = RecordedCalls(report);
 		Assert.DoesNotContain("z:load", calls);
 		Assert.DoesNotContain("a:postload", calls);
+	}
+
+	[Trait("Category", "UsesFileSystem")]
+	[Fact]
+	public void 模块上下文携带per_mod_Harmony实例()
+	{
+		// 同模组内两个模块应共享同一实例(id = 模组 uid);Id 经 OnLoad 记录到共享记录器
+		var report = Run(false,
+			BuildModuleMod("com.t.a", "ModA", "", @"Record(""id:"" + Patcher!.Id);", ""),
+			BuildModuleMod("com.t.b", "ModB", "", @"Record(""id:"" + Patcher!.Id);", ""));
+
+		Assert.Equal(2, report.SucceededCount);
+		var calls = RecordedCalls(report);
+		Assert.Equal(["id:com.t.a", "id:com.t.b"], calls);
 	}
 
 	[Trait("Category", "UsesFileSystem")]
