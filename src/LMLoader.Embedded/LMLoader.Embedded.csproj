@@ -1,0 +1,19 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- 公共属性见根目录 Directory.Build.props;内嵌版 NuGet 包主体(P2-17 第一版) -->
+  <PropertyGroup>
+    <PackageId>LMLoader.Embedded</PackageId>
+    <Description>Godot/C# mod loader - embedded bootstrap. Reference and call LMLoaderEmbedded.Initialize in your game entry code.</Description>
+    <PackageTags>godot;modding;mod-loader;modloader;bepinex</PackageTags>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <None Include="README.md" Pack="true" PackagePath="" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\LMLoader.GodotBridge\LMLoader.GodotBridge.csproj" />
+  </ItemGroup>
+
+</Project>
