@@ -35,7 +35,7 @@ public static class PckMounter
 
 				// Godot 的 LoadResourcePack 以 pck 内部记录的 res:// 路径挂载;
 				// 多 pck 覆盖同一 res:// 路径时后挂载覆盖(replaceFiles: true)
-				var mounted = GD.LoadResourcePack(absolute, replaceFiles: true);
+				var mounted = ProjectSettings.LoadResourcePack(absolute, replaceFiles: true);
 				if (mounted)
 				{
 					logger.Info($"已挂载模组 pck: {item.ModUid} ← {pck}");
