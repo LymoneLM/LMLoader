@@ -1,7 +1,11 @@
-<Project Sdk="Microsoft.NET.Sdk"><!-- 公共属性见根目录 Directory.Build.props;本文件只放 Core 差异项 -->
+<Project Sdk="Microsoft.NET.Sdk">
 
-
+  <!-- 公共属性见根目录 Directory.Build.props -->
   <ItemGroup>
     <ProjectReference Include="..\LMLoader.Api\LMLoader.Api.csproj" />
   </ItemGroup>
+  <ItemGroup>
+    <InternalsVisibleTo Include="LMLoader.Core.Tests" />
+  </ItemGroup>
+
 </Project>
