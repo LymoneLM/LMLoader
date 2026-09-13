@@ -198,6 +198,50 @@ public class ModManagerTests : IDisposable
 
 	[Trait("Category", "UsesFileSystem")]
 	[Fact]
+	public void AfterPlan回调_拿到拓扑序计划_在生命周期前执行()
+	{
+		CreateMod("com.t.hello", @"CallRecorder.Items.Add(""hello:load"");");
+
+		Core.Dependency.LoadPlan? seen = null;
+		var options = new LoaderOptions
+		{
+			ModsRootPath = Path.Combine(_root, "mods"),
+			GameId = "com.game.test",
+			ApiVersion = new Version(1, 0, 0, 0),
+			AfterPlan = plan => seen = plan,
+		};
+		using var manager = new ModManager(options);
+
+		var result = manager.LoadAll();
+
+		Assert.NotNull(seen);
+		Assert.Equal(["com.t.hello.main"], seen!.Ordered.Select(m => m.ModuleUid));
+
+		// 回调先于生命周期:管线保证;此处验证回调后加载仍完整
+		Assert.NotNull(result.Lifecycle);
+		Assert.Equal(1, result.Lifecycle.SucceededCount);
+	}
+
+	[Trait("Category", "UsesFileSystem")]
+	[Fact]
+	public void AfterPlan回调抛异常_视为宿主配置错误直接上抛()
+	{
+		CreateMod("com.t.hello", "");
+
+		var options = new LoaderOptions
+		{
+			ModsRootPath = Path.Combine(_root, "mods"),
+			GameId = "com.game.test",
+			ApiVersion = new Version(1, 0, 0, 0),
+			AfterPlan = _ => throw new InvalidOperationException("宿主挂载失败"),
+		};
+		using var manager = new ModManager(options);
+
+		Assert.Throws<InvalidOperationException>(() => manager.LoadAll());
+	}
+
+	[Trait("Category", "UsesFileSystem")]
+	[Fact]
 	public void 模组目录不存在_抛配置异常()
 	{
 		var options = new LoaderOptions { ModsRootPath = Path.Combine(_root, "no-such-dir") };

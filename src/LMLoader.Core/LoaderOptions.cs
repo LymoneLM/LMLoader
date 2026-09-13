@@ -31,6 +31,13 @@ public sealed class LoaderOptions
 	/// <summary>游戏程序集解析器(P0-1:Godot 将游戏程序集装在自身 ALC,需宿主环境按名返回)。</summary>
 	public Func<AssemblyName, Assembly?>? GameAssemblyResolver { get; init; }
 
+	/// <summary>
+	/// 规划完成后的挂载回调:在依赖规划成功后、生命周期执行前调用(Godot 版在此挂载 pck,
+	/// 草稿:pck 早于逻辑)。回调抛异常视为宿主配置错误,直接上抛(D7 宽松语义仅针对模组代码)。
+	/// 整批拒绝(循环依赖)时不会调用。
+	/// </summary>
+	public Action<Dependency.LoadPlan>? AfterPlan { get; init; }
+
 	/// <summary>最低日志级别。</summary>
 	public Api.LmLogLevel MinimumLogLevel { get; init; } = Api.LmLogLevel.Info;
 }

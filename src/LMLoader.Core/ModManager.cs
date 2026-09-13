@@ -104,10 +104,11 @@ public sealed class ModManager : IDisposable
 		// ---- 4. 依赖规划 ----
 		var plan = DependencyPlanner.Plan(manifests);
 
-		// ---- 5. 生命周期(整批拒绝时跳过) ----
+		// ---- 5. 生命周期(整批拒绝时跳过;规划后回调供宿主挂载 pck 等资源) ----
 		LifecycleReport? lifecycle = null;
 		if (!plan.BatchRejected)
 		{
+			_options.AfterPlan?.Invoke(plan);
 			lifecycle = new LifecycleRunner(_assemblyLoader, LoggerRouter, _options.Strict, Services).Execute(plan);
 		}
 
