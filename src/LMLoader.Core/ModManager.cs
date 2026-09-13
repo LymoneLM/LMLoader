@@ -20,12 +20,16 @@ public sealed class ModManager : IDisposable
 {
 	private readonly LoaderOptions _options;
 	private readonly ModAssemblyLoader _assemblyLoader;
+	private readonly Config.ConfigManager? _configManager;
 
 	/// <summary>日志中枢;宿主可自行增加 sink(文件/内存环形缓冲在阶段 4 提供)。</summary>
 	public LoggerRouter LoggerRouter { get; }
 
 	/// <summary>跨模组服务注册表(D4)。</summary>
 	public ServiceRegistry Services { get; }
+
+	/// <summary>配置协调器(D11);未配置 ConfigRootPath 时为 null(4.4 起热重载由此驱动)。</summary>
+	public Config.ConfigManager? Configs => _configManager;
 
 	public ModManager(LoaderOptions options, LoggerRouter? loggerRouter = null, ServiceRegistry? serviceRegistry = null)
 	{
@@ -47,6 +51,12 @@ public sealed class ModManager : IDisposable
 			LoggerRouter.GetLogger(LifecycleRunner.LoaderLogUid),
 			shared,
 			options.GameAssemblyResolver);
+
+		_configManager = string.IsNullOrEmpty(options.ConfigRootPath)
+			? null
+			: new Config.ConfigManager(
+				options.ConfigRootPath,
+				logger: LoggerRouter.GetLogger(LifecycleRunner.LoaderLogUid));
 	}
 
 	/// <summary>执行完整加载流程;可重复调用(如重启前重新扫描),每次独立规划。</summary>
@@ -111,7 +121,8 @@ public sealed class ModManager : IDisposable
 		if (!plan.BatchRejected)
 		{
 			_options.AfterPlan?.Invoke(plan);
-			lifecycle = new LifecycleRunner(_assemblyLoader, LoggerRouter, _options.Strict, Services).Execute(plan);
+			lifecycle = new LifecycleRunner(_assemblyLoader, LoggerRouter, _options.Strict, Services, _configManager)
+				.Execute(plan);
 		}
 
 		// ---- 6. 人可读汇总 ----

@@ -28,16 +28,20 @@ public sealed class LifecycleRunner
 	private readonly LoggerRouter _loggerRouter;
 	private readonly ServiceRegistry? _serviceRegistry;
 	private readonly bool _strict;
+	private readonly Config.ConfigManager? _configManager;
+	private readonly Dictionary<string, Api.Config.ModConfig> _modConfigs = new(StringComparer.Ordinal);
 
 	public LifecycleRunner(
 		ModAssemblyLoader assemblyLoader,
 		LoggerRouter loggerRouter,
 		bool strict = false,
-		ServiceRegistry? serviceRegistry = null)
+		ServiceRegistry? serviceRegistry = null,
+		Config.ConfigManager? configManager = null)
 	{
 		_assemblyLoader = assemblyLoader ?? throw new ArgumentNullException(nameof(assemblyLoader));
 		_loggerRouter = loggerRouter ?? throw new ArgumentNullException(nameof(loggerRouter));
 		_serviceRegistry = serviceRegistry;
+		_configManager = configManager;
 		_strict = strict;
 	}
 
@@ -45,6 +49,7 @@ public sealed class LifecycleRunner
 	{
 		var stopwatch = System.Diagnostics.Stopwatch.StartNew();
 		var loaderLogger = _loggerRouter.GetLogger(LoaderLogUid);
+		_modConfigs.Clear();
 		var states = plan.Ordered.Select(item => new RunState(item)).ToArray();
 
 		var hardDependents = BuildHardDependents(states);
@@ -82,6 +87,9 @@ public sealed class LifecycleRunner
 				aborted |= _strict;
 			}
 		}
+
+		// ---- 配置合并(D11):PreLoad 声明完毕后、OnLoad 之前读入磁盘值 ----
+		_configManager?.ApplyAfterPreLoad(_modConfigs.ToList());
 
 		// ---- Load ----
 		foreach (var state in states)
@@ -213,7 +221,7 @@ public sealed class LifecycleRunner
 		var instance = (LmModule)(Activator.CreateInstance(type) ?? throw new MissingMemberException(
 			$"类型 \"{state.Item.Module.Type}\" 缺少公共无参构造函数"));
 
-		state.Config = new ModConfig(); // 4.3:PreLoad 后按 D11 合并磁盘配置
+		state.Config = GetOrCreateModConfig(state.Item.ModUid);
 		instance.Attach(new LmModuleContext(
 			state.Item.ModuleUid,
 			state.Item.ModUid,
@@ -223,6 +231,18 @@ public sealed class LifecycleRunner
 			state.Config));
 
 		return instance;
+	}
+
+	private Api.Config.ModConfig GetOrCreateModConfig(string modUid)
+	{
+		if (!_modConfigs.TryGetValue(modUid, out var config))
+		{
+			config = new Api.Config.ModConfig();
+			_modConfigs[modUid] = config;
+			_configManager?.Register(modUid, config);
+		}
+
+		return config;
 	}
 
 	private void Fail(

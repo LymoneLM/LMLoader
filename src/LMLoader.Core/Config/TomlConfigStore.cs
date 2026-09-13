@@ -10,7 +10,7 @@ namespace LMLoader.Core.Config;
 /// 根目录由宿主提供(见 <see cref="LoaderOptions.ConfigRootPath"/>),Core 不感知 user:// 语义。
 /// 文件缺失视为空配置(首次运行常态);解析错误上抛,由上层按 D11 宽容语义处置。
 /// </summary>
-public sealed class TomlConfigStore
+public class TomlConfigStore
 {
 	/// <summary>模组配置文件路径约定(D11);uid 经清单校验为反向域名,此处仅防御路径分隔符。</summary>
 	public static string GetConfigFilePath(string rootPath, string modUid)
@@ -27,7 +27,7 @@ public sealed class TomlConfigStore
 
 	/// <summary>读入配置表;文件不存在返回空表。</summary>
 	/// <exception cref="Exception">文件存在但不是合法 TOML(Tomlyn 2.x 解析异常类型不固定,交由上层宽容处置)。</exception>
-	public TomlTable Read(string filePath)
+	public virtual TomlTable Read(string filePath)
 	{
 		ArgumentException.ThrowIfNullOrWhiteSpace(filePath);
 		if (!File.Exists(filePath))
@@ -40,7 +40,7 @@ public sealed class TomlConfigStore
 	}
 
 	/// <summary>写出配置表;目录不存在自动创建。注意:重建全文,用户手写注释不保留(迭代空间)。</summary>
-	public void Write(string filePath, TomlTable table)
+	public virtual void Write(string filePath, TomlTable table)
 	{
 		ArgumentException.ThrowIfNullOrWhiteSpace(filePath);
 		ArgumentNullException.ThrowIfNull(table);
