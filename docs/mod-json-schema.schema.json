@@ -1,0 +1,115 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://github.com/LymoneLM/LMLoader/docs/mod-json-schema.schema.json",
+  "title": "LMLoader mod.json",
+  "description": "LMLoader 模组清单 v0.1(决策 D9)。注意:本 schema 供作者侧 lint 严格校验;加载器运行时更宽容(未知字段忽略+警告)。",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "uid", "name", "version", "gameId", "loaderVersion", "entry"],
+  "properties": {
+    "schemaVersion": {
+      "type": "integer",
+      "const": 1,
+      "description": "清单格式主版本;加载器不识别的主版本拒载"
+    },
+    "uid": { "$ref": "#/definitions/reverseDomain" },
+    "name": { "type": "string", "minLength": 1 },
+    "version": { "$ref": "#/definitions/semver" },
+    "authors": {
+      "type": "array",
+      "items": { "type": "string", "minLength": 1 }
+    },
+    "description": { "type": "string" },
+    "icon": {
+      "type": "string",
+      "description": "相对模组目录的图标路径",
+      "pattern": "^(?!res:|file:|/|[A-Za-z]:)[^\\0]+$"
+    },
+    "website": { "type": "string" },
+    "gameId": {
+      "type": "string",
+      "minLength": 1,
+      "description": "目标游戏标识,与宿主游戏约定比对",
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*$"
+    },
+    "loaderVersion": {
+      "$ref": "#/definitions/semver",
+      "description": "依赖的 LMLoader API 版本;v1 仅接受精确 SemVer,区间语法阶段 5 落地"
+    },
+    "entry": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["assembly", "modules"],
+      "properties": {
+        "assembly": {
+          "type": "string",
+          "pattern": "^[^/\\\\<>|:*?\"\\0]+\\.dll$",
+          "description": "模组 DLL 文件名,相对模组目录"
+        },
+        "modules": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "$ref": "#/definitions/module" }
+        }
+      }
+    },
+    "resources": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "pck": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^(?!res:|file:|/|[A-Za-z]:)(?!.*\\.\\.)[^\\0]+$",
+            "description": "pck 路径,相对模组目录,禁止绝对路径与 .. 上跳"
+          }
+        }
+      }
+    }
+  },
+  "definitions": {
+    "reverseDomain": {
+      "type": "string",
+      "description": "反向域名结构唯一标识,至少两段(如 com.author.modname)",
+      "pattern": "^[a-zA-Z][a-zA-Z0-9_-]*(\\.[a-zA-Z][a-zA-Z0-9_-]*)+$",
+      "maxLength": 128
+    },
+    "semver": {
+      "type": "string",
+      "description": "SemVer 2.0.0(官方正则)",
+      "pattern": "^(0|[1-9]\\d*)\\.(0|[1-9]\\d*)\\.(0|[1-9]\\d*)(?:-((?:0|[1-9]\\d*|\\d*[a-zA-Z-][0-9a-zA-Z-]*)(?:\\.(?:0|[1-9]\\d*|\\d*[a-zA-Z-][0-9a-zA-Z-]*))*))?(?:\\+([0-9a-zA-Z-]+(?:\\.[0-9a-zA-Z-]+)*))?$"
+    },
+    "module": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["uid", "type"],
+      "properties": {
+        "uid": { "$ref": "#/definitions/reverseDomain" },
+        "type": {
+          "type": "string",
+          "description": "完整命名空间全名;无命名空间的类无法被按名查找",
+          "pattern": "^[A-Za-z_][A-Za-z0-9_]*(\\.[A-Za-z_][A-Za-z0-9_]*)+$",
+          "maxLength": 512
+        },
+        "depends": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["uid"],
+            "properties": {
+              "uid": { "$ref": "#/definitions/reverseDomain" },
+              "version": { "$ref": "#/definitions/semver" },
+              "soft": {
+                "type": "boolean",
+                "default": false,
+                "description": "true = 软依赖,仅约束顺序"
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}
