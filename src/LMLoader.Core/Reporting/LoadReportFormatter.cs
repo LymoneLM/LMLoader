@@ -33,10 +33,30 @@ public static class LoadReportFormatter
 {
 	private const int MaxDetailLength = 160;
 
-	/// <summary>合并规划期跳过(元数据错误/冲突)与运行期结果为统一行集。</summary>
-	public static IReadOnlyList<ModuleReportRow> BuildRows(LoadPlan? plan, LifecycleReport? lifecycle)
+	/// <summary>
+	/// 合并规划期跳过(元数据错误/冲突)与运行期结果为统一行集。
+	/// <paramref name="manifestFailures"/> 为清单级失败(无法定位模块 uid,以文件路径标识)。
+	/// </summary>
+	public static IReadOnlyList<ModuleReportRow> BuildRows(
+		LoadPlan? plan,
+		LifecycleReport? lifecycle,
+		IEnumerable<(string SourcePath, string Reason)>? manifestFailures = null)
 	{
 		var rows = new List<ModuleReportRow>();
+
+		if (manifestFailures is not null)
+		{
+			foreach (var (sourcePath, reason) in manifestFailures)
+			{
+				rows.Add(new ModuleReportRow
+				{
+					ModuleUid = sourcePath,
+					ModUid = "",
+					Status = ModuleLoadStatus.Skipped,
+					Detail = reason,
+				});
+			}
+		}
 
 		if (plan is not null)
 		{

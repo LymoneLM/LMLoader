@@ -1,0 +1,160 @@
+// SPDX-License-Identifier: LGPL-3.0-or-later
+
+using System.Reflection;
+using LMLoader.Api;
+using LMLoader.Core.Dependency;
+using LMLoader.Core.Lifecycle;
+using LMLoader.Core.Loading;
+using LMLoader.Core.Logging;
+using LMLoader.Core.Manifest;
+using LMLoader.Core.Reporting;
+using LMLoader.Core.Versioning;
+
+namespace LMLoader.Core;
+
+/// <summary>
+/// 加载器门面:扫描 mods 目录 → 读取 mod.json → 过滤(gameId/loaderVersion) → 依赖规划 →
+/// 生命周期执行 → 人可读汇总(D7:模组级失败一律记录不抛出;loader 配置错误直接抛异常)。
+/// </summary>
+public sealed class ModManager : IDisposable
+{
+	private readonly LoaderOptions _options;
+	private readonly ModAssemblyLoader _assemblyLoader;
+
+	/// <summary>日志中枢;宿主可自行增加 sink(文件/内存环形缓冲在阶段 4 提供)。</summary>
+	public LoggerRouter LoggerRouter { get; }
+
+	/// <summary>跨模组服务注册表(D4)。</summary>
+	public ServiceRegistry Services { get; }
+
+	public ModManager(LoaderOptions options, LoggerRouter? loggerRouter = null, ServiceRegistry? serviceRegistry = null)
+	{
+		ArgumentNullException.ThrowIfNull(options);
+
+		_options = options;
+		LoggerRouter = loggerRouter ?? new LoggerRouter { MinimumLevel = options.MinimumLogLevel };
+		Services = serviceRegistry ?? new ServiceRegistry();
+
+		var shared = new List<Assembly> { typeof(LmModule).Assembly }; // D1:loader 供给 LMLoader.Api
+		if (options.SharedLibraries is not null)
+		{
+			shared.AddRange(options.SharedLibraries);
+		}
+
+		_assemblyLoader = new ModAssemblyLoader(
+			LoggerRouter.GetLogger(LifecycleRunner.LoaderLogUid),
+			shared,
+			options.GameAssemblyResolver);
+	}
+
+	/// <summary>执行完整加载流程;可重复调用(如重启前重新扫描),每次独立规划。</summary>
+	public LoadResult LoadAll()
+	{
+		if (!Directory.Exists(_options.ModsRootPath))
+		{
+			throw new DirectoryNotFoundException($"mods 根目录不存在: {_options.ModsRootPath}");
+		}
+
+		var loaderLogger = LoggerRouter.GetLogger(LifecycleRunner.LoaderLogUid);
+		var manifestFailures = new List<(string SourcePath, string Reason)>();
+		var readWarnings = new List<string>();
+		var manifests = new List<ModManifest>();
+
+		// ---- 1. 扫描与读取 ----
+		var scan = ScanManifestPaths(_options.ModsRootPath);
+		readWarnings.AddRange(scan.Warnings);
+
+		foreach (var manifestPath in scan.Paths)
+		{
+			var result = ModManifestReader.ReadFile(manifestPath);
+			readWarnings.AddRange(result.Warnings.Select(w => $"{manifestPath}: {w}"));
+
+			if (!result.Success)
+			{
+				manifestFailures.Add((manifestPath, string.Join("; ", result.Errors)));
+				loaderLogger.Warn($"清单读取失败,模组跳过: {manifestPath}");
+				continue;
+			}
+
+			var manifest = result.Manifest!;
+
+			// ---- 2. 宿主过滤:gameId(D9:不匹配拒载) ----
+			if (!string.IsNullOrEmpty(_options.GameId) &&
+				!string.Equals(manifest.GameId, _options.GameId, StringComparison.Ordinal))
+			{
+				manifestFailures.Add((manifestPath, $"gameId 不匹配: 期望 {_options.GameId},实际 {manifest.GameId}"));
+				continue;
+			}
+
+			// ---- 3. loaderVersion 校验(v1 精确匹配;区间语法阶段 5) ----
+			var apiVersion = _options.ApiVersion ?? typeof(LmModule).Assembly.GetName().Version!;
+			var required = new SemVer(apiVersion.Major, apiVersion.Minor, Math.Max(apiVersion.Build, 0));
+			if (manifest.LoaderVersion != required)
+			{
+				manifestFailures.Add((manifestPath,
+					$"loaderVersion 不满足: 清单要求 {manifest.LoaderVersion},当前加载器 API {required}(v1 仅精确匹配)"));
+				continue;
+			}
+
+			manifests.Add(manifest);
+		}
+
+		loaderLogger.Info($"发现 {manifests.Count} 个有效模组清单(失败 {manifestFailures.Count} 个)");
+
+		// ---- 4. 依赖规划 ----
+		var plan = DependencyPlanner.Plan(manifests);
+
+		// ---- 5. 生命周期(整批拒绝时跳过) ----
+		LifecycleReport? lifecycle = null;
+		if (!plan.BatchRejected)
+		{
+			lifecycle = new LifecycleRunner(_assemblyLoader, LoggerRouter, _options.Strict, Services).Execute(plan);
+		}
+
+		// ---- 6. 人可读汇总 ----
+		var rows = LoadReportFormatter.BuildRows(plan, lifecycle, manifestFailures);
+		var summary = LoadReportFormatter.Render(rows, plan, lifecycle);
+
+		loaderLogger.Info(Environment.NewLine + summary);
+
+		return new LoadResult
+		{
+			LoadedManifests = manifests,
+			ReadWarnings = readWarnings,
+			Plan = plan,
+			Lifecycle = lifecycle,
+			SummaryText = summary,
+		};
+	}
+
+	/// <summary>递归扫描 <c>*mod.json</c>;同目录多份清单只取字典序第一份并告警。</summary>
+	private static (List<string> Paths, List<string> Warnings) ScanManifestPaths(string root)
+	{
+		var byDirectory = Directory.EnumerateFiles(root, "*mod.json", SearchOption.AllDirectories)
+			.OrderBy(p => p, StringComparer.Ordinal)
+			.GroupBy(Path.GetDirectoryName, StringComparer.Ordinal);
+
+		var paths = new List<string>();
+		var warnings = new List<string>();
+
+		foreach (var group in byDirectory)
+		{
+			var candidates = group.ToList();
+			paths.Add(candidates[0]);
+
+			if (candidates.Count > 1)
+			{
+				warnings.Add(
+					$"目录 \"{group.Key}\" 存在多份清单,已采用 {Path.GetFileName(candidates[0])}," +
+					$"忽略 {candidates.Count - 1} 份(模组打包错误,CLI lint 将兜底校验)");
+			}
+		}
+
+		return (paths, warnings);
+	}
+
+	public void Dispose()
+	{
+		_assemblyLoader.Dispose();
+	}
+}
