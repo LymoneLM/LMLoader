@@ -42,4 +42,11 @@ public sealed class LoaderOptions
 
 	/// <summary>最低日志级别。</summary>
 	public Api.LmLogLevel MinimumLogLevel { get; init; } = Api.LmLogLevel.Info;
+
+	/// <summary>
+	/// 模组配置根目录(D11):每模组一份 <c>&lt;root&gt;/&lt;modUid&gt;.toml</c>。
+	/// null/空 = 关闭配置系统。宿主负责给出物理路径(Godot 版传 <c>user://configs</c> 的全局化路径;
+	/// Steam 环境游戏目录不可写,user:// 是硬约束),Core 不感知 user:// 语义。
+	/// </summary>
+	public string? ConfigRootPath { get; init; }
 }
