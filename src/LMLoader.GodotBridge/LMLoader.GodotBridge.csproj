@@ -1,0 +1,9 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- 公共属性见根目录 Directory.Build.props;GodotSharp 版本在 Directory.Packages.props(CPM) -->
+  <ItemGroup>
+    <ProjectReference Include="..\LMLoader.Api\LMLoader.Api.csproj" />
+    <ProjectReference Include="..\LMLoader.Core\LMLoader.Core.csproj" />
+  </ItemGroup>
+
+</Project>
