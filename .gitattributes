@@ -1,0 +1,9 @@
+# 仓库统一为 LF 入库与检出;Windows 工具链(Rider/dotnet)均正常处理
+* text=auto eol=lf
+
+# 二进制资产(模组 pck、图标等,后续阶段使用)
+*.pck binary
+*.png binary
+*.jpg binary
+*.ico binary
+*.dll binary
