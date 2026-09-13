@@ -100,6 +100,7 @@ public sealed class ConfigManager : IDisposable
 		foreach (var entry in config.Entries)
 		{
 			var raw = TryGetRaw(disk, entry.Section, entry.Key);
+			_logger.Debug($"热重载项 [{entry.Section}] {entry.Key}: 文件值={(raw is null ? "(无)" : raw.GetType().Name + " " + raw)}");
 			if (raw is null)
 			{
 				continue;
@@ -132,6 +133,8 @@ public sealed class ConfigManager : IDisposable
 
 			return;
 		}
+
+		_logger.Debug($"配置合并 \"{modUid}\": 文件{(originalText is null ? "不存在,按默认值写回" : "已读入")},路径 {path}");
 
 		foreach (var entry in config.Entries)
 		{

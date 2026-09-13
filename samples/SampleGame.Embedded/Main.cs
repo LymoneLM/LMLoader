@@ -39,17 +39,13 @@ public partial class Main : Node
 			var result = loader.LastLoadResult;
 			if (result is null || result.Lifecycle is null || result.Lifecycle.SucceededCount != 1)
 			{
-				GD.PrintErr("LMLOADER-SMOKE-FAIL");
-				GD.PrintErr(result?.SummaryText ?? "(无加载结果)");
-				GetTree().Quit(1);
+				SmokeFail(result?.SummaryText ?? "(无加载结果)");
 				return;
 			}
 
 			if (loader.GetModMountPoint("com.lmloader.sample") is null)
 			{
-				GD.PrintErr("LMLOADER-SMOKE-FAIL");
-				GD.PrintErr("模组挂载点缺失(D5)");
-				GetTree().Quit(1);
+				SmokeFail("模组挂载点缺失(D5)");
 				return;
 			}
 
@@ -58,33 +54,20 @@ public partial class Main : Node
 			var rawText = Godot.FileAccess.Open("res://mods/com.lmloader.sample/hello.txt", Godot.FileAccess.ModeFlags.Read);
 			if (rawText is null || rawText.GetAsText().Trim() != "hello-from-pck")
 			{
-				GD.PrintErr("LMLOADER-SMOKE-FAIL");
-				GD.PrintErr("pck 内原始文件不可访问");
-				GetTree().Quit(1);
+				SmokeFail("pck 内原始文件不可访问");
 				return;
 			}
 
 			if (!ResourceLoader.Exists("res://mods/com.lmloader.sample/mod_icon.svg"))
 			{
-				GD.PrintErr("LMLOADER-SMOKE-FAIL");
-				GD.PrintErr("pck 内导入资源(.import 重映射)不可访问");
-				GetTree().Quit(1);
+				SmokeFail("pck 内导入资源(.import 重映射)不可访问");
 				return;
 			}
 
 			var texture = ResourceLoader.Load<Texture2D>("res://mods/com.lmloader.sample/mod_icon.svg");
 			if (texture is null)
 			{
-				GD.PrintErr("LMLOADER-SMOKE-FAIL");
-				GD.PrintErr("导入资源加载失败");
-				GetTree().Quit(1);
-				return;
-			}
-
-			// 任务 3.4:模组 patch 验证——静态方法 prefix 改写(原语义应为 3)
-			if (Add(1, 2) != 100)
-			{
-				SmokeFail("静态方法 patch 未生效");
+				SmokeFail("导入资源加载失败");
 				return;
 			}
 
@@ -126,33 +109,32 @@ public partial class Main : Node
 			}
 			window.QueueFree();
 
-			// 任务 4.4:热重载引擎链验证——先把配置归一到默认(幂等,消除上次运行遗留),
-			// 再改值 250,防抖后 Add 应跟踪变化
-			if (!WriteSampleConfig(100))
+			// 任务 4.4:热重载引擎链验证。设计:每轮运行只做一次外部写入(同真实用户编辑器
+			// 场景),目标值在 100/250 间交替,使重复运行天然幂等;FSW 事件与 mtime 变化存在
+			// OS 级延迟(实测可到秒级),故用轮询等待生效,而非固定时延。
+			// 第一步:启动合并链——内存值应等于文件现值(boot 时已合并)。
+			var current = ReadSampleConfigMultiplier();
+			WaitUntil(() => Add(1, 2) == current, 8, ok =>
 			{
-				SmokeFail("配置文件写入失败");
-				return;
-			}
-
-			GetTree().CreateTimer(1.5).Timeout += () =>
-			{
-				if (Add(1, 2) != 100)
+				if (!ok)
 				{
-					SmokeFail($"配置热重载(归一到默认)未生效:Add={Add(1, 2)}");
+					SmokeFail($"启动配置/patch 链未生效:Add={Add(1, 2)}(期望 {current})");
 					return;
 				}
 
-				if (!WriteSampleConfig(250))
+				// 第二步:改文件 → 防抖重载 → 行为跟踪
+				var target = current == 250 ? 100 : 250;
+				if (!WriteSampleConfig(target))
 				{
 					SmokeFail("配置文件写入失败");
 					return;
 				}
 
-				GetTree().CreateTimer(1.5).Timeout += () =>
+				WaitUntil(() => Add(1, 2) == target, 8, ok2 =>
 				{
-					if (Add(1, 2) != 250)
+					if (!ok2)
 					{
-						SmokeFail($"配置热重载未生效:Add={Add(1, 2)}(期望 250)");
+						SmokeFail($"配置热重载未生效:Add={Add(1, 2)}(期望 {target})");
 						return;
 					}
 
@@ -169,9 +151,57 @@ public partial class Main : Node
 						GD.Print(result.SummaryText);
 						GetTree().Quit(0);
 					};
-				};
-			};
+				});
+			});
 		};
+	}
+
+	/// <summary>从配置文件提取 Multiplier 当前值;文件缺失/解析失败按声明默认 100。</summary>
+	private static int ReadSampleConfigMultiplier()
+	{
+		try
+		{
+			var text = System.IO.File.ReadAllText(System.IO.Path.Combine(
+				ProjectSettings.GlobalizePath("user://configs"), "com.lmloader.sample.toml"));
+			foreach (var line in text.Split('\n'))
+			{
+				var trimmed = line.Trim();
+				if (trimmed.StartsWith("Multiplier", StringComparison.Ordinal))
+				{
+					var value = trimmed.Split('=', 2)[1].Trim();
+					return int.Parse(value);
+				}
+			}
+		}
+		catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or FormatException)
+		{
+		}
+
+		return 100;
+	}
+
+	/// <summary>每 0.25s 轮询条件直到满足或超时(秒);结果经回调异步返回。</summary>
+	private void WaitUntil(Func<bool> condition, double timeoutSeconds, Action<bool> done)
+	{
+		var deadline = Time.GetTicksMsec() + (ulong)(timeoutSeconds * 1000);
+		void Tick()
+		{
+			if (condition())
+			{
+				done(true);
+				return;
+			}
+
+			if (Time.GetTicksMsec() >= deadline)
+			{
+				done(false);
+				return;
+			}
+
+			GetTree().CreateTimer(0.25).Timeout += Tick;
+		}
+
+		Tick();
 	}
 
 	private void SmokeFail(string reason)
@@ -181,16 +211,21 @@ public partial class Main : Node
 		GetTree().Quit(1);
 	}
 
+	/// <summary>写样例配置(走 System.IO,与用户编辑器/外部工具的真实写入路径一致;
+	/// 实测导出环境 Godot FileAccess 写入的 mtime/关闭事件对 .NET 侧不可见)。</summary>
 	private static bool WriteSampleConfig(int multiplier)
 	{
-		using var file = Godot.FileAccess.Open(
-			"user://configs/com.lmloader.sample.toml", Godot.FileAccess.ModeFlags.Write);
-		if (file is null)
+		var path = System.IO.Path.Combine(
+			ProjectSettings.GlobalizePath("user://configs"), "com.lmloader.sample.toml");
+		try
 		{
+			System.IO.File.WriteAllText(path, $"[Patch]\nMultiplier = {multiplier}\n");
+			return true;
+		}
+		catch (Exception ex)
+		{
+			GD.PushWarning($"写配置失败: {ex.Message}");
 			return false;
 		}
-
-		file.StoreString($"[Patch]\nMultiplier = {multiplier}\n");
-		return true;
 	}
 }

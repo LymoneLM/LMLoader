@@ -124,6 +124,7 @@ public partial class LMLoaderAutoload : Node
 		LastLoadResult = _modManager.LoadAll();
 		_summaryForWindow = LastLoadResult.SummaryText;
 		_modManager.Configs?.StartHotReload(); // 4.4:配置改文件即生效
+		logger.Debug($"引导完成: 配置根={(_modManager.Configs is null ? "(未启用)" : "已启用")},热重载=已启动");
 		BuildMountPoints(LastLoadResult);
 		BootCompleted?.Invoke();
 	}
