@@ -1,5 +1,7 @@
 // SPDX-License-Identifier: LGPL-3.0-or-later
 
+using System.Reflection;
+using HarmonyLib;
 using LMLoader.Api;
 
 namespace Sample;
@@ -24,7 +26,25 @@ public class SampleModule : LmModule
 	{
 		Logger.Info("样例模组 OnLoad:发布 IClockService");
 		PublishService<IClockService>(new ClockService());
+
+		// 任务 3.4:patch 游戏静态方法与引擎逐帧调用的 _Process(native→managed)
+		var patcher = Patcher ?? throw new InvalidOperationException("加载器未提供 per-mod Patcher");
+		patcher.Patch(
+			typeof(SampleGame.Main).GetMethod(nameof(SampleGame.Main.Add))!,
+			prefix: new HarmonyMethod(typeof(SampleModule).GetMethod(nameof(AddPrefix), BindingFlags.NonPublic | BindingFlags.Static)!));
+		patcher.Patch(
+			typeof(SampleGame.Main).GetMethod(nameof(SampleGame.Main._Process), BindingFlags.Instance | BindingFlags.Public)!,
+			postfix: new HarmonyMethod(typeof(SampleModule).GetMethod(nameof(ProcessPostfix), BindingFlags.NonPublic | BindingFlags.Static)!));
+		Logger.Info("样例模组 OnLoad:已 patch Main.Add 与 Main._Process");
 	}
+
+	private static bool AddPrefix(ref int __result)
+	{
+		__result = 100;
+		return false; // 跳过原方法
+	}
+
+	private static void ProcessPostfix() => SampleGame.Main.ProcessPatchHits++;
 
 	public override void OnPostLoad() => Logger.Info("样例模组 OnPostLoad");
 }

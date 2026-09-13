@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: LGPL-3.0-or-later
 
+using System.Reflection;
 using Godot;
 using LMLoader.Api;
 using LMLoader.Core;
@@ -33,6 +34,15 @@ public partial class LMLoaderAutoload : Node
 
 	/// <summary>loaderVersion 基线覆盖;缺省取 LMLoader.Api 程序集版本。入树前设置。</summary>
 	public Version? ApiVersion { get; set; }
+
+	/// <summary>
+	/// 游戏程序集解析器(P0-1:游戏程序集在宿主自身 ALC;模组要 patch 游戏方法时必需)。
+	/// 嵌入模式典型实现:<c>n => n.Name == "我的游戏程序集名" ? typeof(入口类型).Assembly : null</c>。入树前设置。
+	/// </summary>
+	public Func<AssemblyName, Assembly?>? GameAssemblyResolver { get; set; }
+
+	/// <summary>是否由 loader 供给 HarmonyX(见 LoaderOptions.SupplyHarmonyX)。入树前设置。</summary>
+	public bool SupplyHarmonyX { get; set; } = true;
 
 	/// <summary>最近一次加载结果;未加载(无 mods 目录)时为 null。</summary>
 	public LoadResult? LastLoadResult { get; private set; }
@@ -95,6 +105,8 @@ public partial class LMLoaderAutoload : Node
 			ModsRootPath = modsRoot,
 			GameId = GameId,
 			ApiVersion = ApiVersion,
+			GameAssemblyResolver = GameAssemblyResolver,
+			SupplyHarmonyX = SupplyHarmonyX,
 			AfterPlan = plan => PckMounter.MountInPlanOrder(plan, logger),
 		}, router);
 

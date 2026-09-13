@@ -25,8 +25,16 @@ public sealed class LoaderOptions
 	/// </summary>
 	public Version? ApiVersion { get; init; }
 
-	/// <summary>loader 统一供给的公共库(D1);LMLoader.Api 自动纳入,无需重复提供。</summary>
+	/// <summary>
+	/// loader 统一供给的公共库(D1);LMLoader.Api 自动纳入,无需重复提供。
+	/// </summary>
 	public IEnumerable<Assembly>? SharedLibraries { get; init; }
+
+	/// <summary>
+	/// 是否由 loader 供给 HarmonyX(D1)。默认 true;若宿主为导出构建、且 MonoMod 自包含初始化
+	/// 与宿主打包形态冲突(见推进看板 M3 阻塞记录),可关闭并让模组自带 HarmonyX 链。
+	/// </summary>
+	public bool SupplyHarmonyX { get; init; } = true;
 
 	/// <summary>游戏程序集解析器(P0-1:Godot 将游戏程序集装在自身 ALC,需宿主环境按名返回)。</summary>
 	public Func<AssemblyName, Assembly?>? GameAssemblyResolver { get; init; }

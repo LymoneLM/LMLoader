@@ -3,6 +3,8 @@
 using Godot;
 using LMLoader.Embedded;
 
+namespace SampleGame;
+
 /// <summary>
 /// 样例游戏主场景:内嵌版一行接入的活文档。
 /// 引导节点延迟入树,加载为异步完成:订阅 BootCompleted 后断言结果。
@@ -10,6 +12,16 @@ using LMLoader.Embedded;
 /// </summary>
 public partial class Main : Node
 {
+	/// <summary>样例目标:被模组 patch 的静态方法(原语义 1+2=3;模组 prefix 改写为 100)</summary>
+	public static int Add(int a, int b) => a + b;
+
+	/// <summary>样例目标:被模组 postfix 的 _Process 命中计数(引擎 native→managed 路径,P0-1 核心风险点)</summary>
+	public static int ProcessPatchHits;
+
+	public override void _Process(double delta)
+	{
+	}
+
 	public override void _Ready()
 	{
 		// 一行接入(D5/D7 能力经 loader 节点访问)
@@ -17,6 +29,8 @@ public partial class Main : Node
 		{
 			l.GameId = "com.lmloader.samplegame";
 			l.ApiVersion = new Version(1, 0, 0); // 样例自定基线;缺省取 LMLoader.Api 程序集版本
+			// P0-1:游戏程序集在宿主自身 ALC,须按名显式供给模组(嵌入模式由入口程序集自供)
+			l.GameAssemblyResolver = n => n.Name == "SampleGame.Embedded" ? typeof(Main).Assembly : null;
 		});
 
 		loader.BootCompleted += () =>
@@ -66,9 +80,30 @@ public partial class Main : Node
 				return;
 			}
 
-			GD.Print("LMLOADER-SMOKE-PASS");
-			GD.Print(result.SummaryText);
-			GetTree().Quit(0);
+			// 任务 3.4:模组 patch 验证——静态方法 prefix 改写(原语义应为 3)
+			if (Add(1, 2) != 100)
+			{
+				GD.PrintErr("LMLOADER-SMOKE-FAIL");
+				GD.PrintErr("静态方法 patch 未生效");
+				GetTree().Quit(1);
+				return;
+			}
+
+			// 引擎 native→managed 路径:_Process 由引擎每帧调用,postfix 计数应持续增长
+			GetTree().CreateTimer(0.5).Timeout += () =>
+			{
+				if (ProcessPatchHits == 0)
+				{
+					GD.PrintErr("LMLOADER-SMOKE-FAIL");
+					GD.PrintErr("_Process postfix 未命中(native→managed)");
+					GetTree().Quit(1);
+					return;
+				}
+
+				GD.Print($"LMLOADER-SMOKE-PASS (patch hits: {ProcessPatchHits})");
+				GD.Print(result.SummaryText);
+				GetTree().Quit(0);
+			};
 		};
 	}
 }

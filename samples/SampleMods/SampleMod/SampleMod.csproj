@@ -7,7 +7,13 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <PackageReference Include="HarmonyX" />
+    <PackageReference Include="MonoMod.RuntimeDetour" />
     <ProjectReference Include="..\..\..\src\LMLoader.Api\LMLoader.Api.csproj" />
+    <!-- patch 目标为游戏程序集:仅编译期引用(不随模组分发,运行期经 GameAssemblyResolver 解析) -->
+    <ProjectReference Include="..\..\SampleGame.Embedded\SampleGame.Embedded.csproj">
+      <Private>false</Private>
+    </ProjectReference>
   </ItemGroup>
 
 </Project>

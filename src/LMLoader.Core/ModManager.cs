@@ -39,8 +39,12 @@ public sealed class ModManager : IDisposable
 		LoggerRouter = loggerRouter ?? new LoggerRouter { MinimumLevel = options.MinimumLogLevel };
 		Services = serviceRegistry ?? new ServiceRegistry();
 
-		// D1:loader 统一供给公共库(Api 与 HarmonyX 必带;模组捆绑副本将被忽略并告警)
-		var shared = new List<Assembly> { typeof(LmModule).Assembly, typeof(Harmony).Assembly };
+		// D1:loader 统一供给公共库(Api 必带;HarmonyX 按 SupplyHarmonyX 开关)
+		var shared = new List<Assembly> { typeof(LmModule).Assembly };
+		if (options.SupplyHarmonyX)
+		{
+			shared.Add(typeof(Harmony).Assembly);
+		}
 		if (options.SharedLibraries is not null)
 		{
 			shared.AddRange(options.SharedLibraries);
