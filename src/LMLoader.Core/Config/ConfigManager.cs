@@ -13,19 +13,40 @@ namespace LMLoader.Core.Config;
 /// PreLoad 后读入 <c>&lt;root&gt;/&lt;modUid&gt;.toml</c> 合并——缺失键补默认并写回、孤儿键保留、
 /// 类型/取值不符回退默认并警告;配置文件解析失败时整模组跳过(用默认值且不写回,保护用户原稿)。
 /// </summary>
-public sealed class ConfigManager
+public sealed class ConfigManager : IDisposable
 {
 	private readonly string _rootPath;
 	private readonly TomlConfigStore _store;
 	private readonly ILmLogger _logger;
 	private readonly Dictionary<string, ModConfig> _configsByMod = new(StringComparer.Ordinal);
+	private ConfigWatcher? _watcher;
 
 	public ConfigManager(string rootPath, TomlConfigStore? store = null, ILmLogger? logger = null)
 	{
 		ArgumentException.ThrowIfNullOrWhiteSpace(rootPath);
 		_rootPath = rootPath;
 		_store = store ?? new TomlConfigStore();
-		_logger = logger ?? NullLogger.Instance;
+		_logger = logger ?? ConfigNullLogger.Instance;
+	}
+
+	/// <summary>
+	/// 开启文件热重载(D11:FileSystemWatcher + 防抖);幂等。回调在监视线程执行。
+	/// 配置目录不存在时自动创建。
+	/// </summary>
+	public void StartHotReload(TimeSpan? debounce = null)
+	{
+		if (_watcher is not null)
+		{
+			return;
+		}
+
+		_watcher = new ConfigWatcher(this, _rootPath, _logger, debounce);
+	}
+
+	public void Dispose()
+	{
+		_watcher?.Dispose();
+		_watcher = null;
 	}
 
 	/// <summary>已注册配置的模组数(诊断用)。</summary>
@@ -221,12 +242,5 @@ public sealed class ConfigManager
 		}
 
 		return Convert.ToInt64(value, CultureInfo.InvariantCulture);
-	}
-
-	private sealed class NullLogger : ILmLogger
-	{
-		public static readonly NullLogger Instance = new();
-
-		public void Log(LmLogLevel level, string message, Exception? exception = null) { }
 	}
 }

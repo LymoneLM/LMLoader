@@ -169,6 +169,7 @@ public sealed class ModManager : IDisposable
 
 	public void Dispose()
 	{
+		_configManager?.Dispose();
 		_assemblyLoader.Dispose();
 	}
 }

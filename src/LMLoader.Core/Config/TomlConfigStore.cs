@@ -39,18 +39,36 @@ public class TomlConfigStore
 			?? throw new InvalidDataException($"配置文件顶层必须是 TOML 表: {filePath}");
 	}
 
-	/// <summary>写出配置表;目录不存在自动创建。注意:重建全文,用户手写注释不保留(迭代空间)。</summary>
+	/// <summary>
+	/// 写出配置表;目录不存在自动创建。临时文件 + 替换保证原子性(热重载监听/游戏读档
+	/// 不会读到半截文件)。注意:重建全文,用户手写注释不保留(迭代空间)。
+	/// </summary>
 	public virtual void Write(string filePath, TomlTable table)
 	{
 		ArgumentException.ThrowIfNullOrWhiteSpace(filePath);
 		ArgumentNullException.ThrowIfNull(table);
 
-		var directory = Path.GetDirectoryName(Path.GetFullPath(filePath));
+		var fullPath = Path.GetFullPath(filePath);
+		var directory = Path.GetDirectoryName(fullPath);
 		if (!string.IsNullOrEmpty(directory))
 		{
 			Directory.CreateDirectory(directory);
 		}
 
-		File.WriteAllText(filePath, TomlSerializer.Serialize(table));
+		var tempPath = Path.Combine(
+			Path.GetDirectoryName(fullPath) ?? ".",
+			$".{Path.GetFileName(fullPath)}.{Guid.NewGuid():N}.tmp");
+		try
+		{
+			File.WriteAllText(tempPath, TomlSerializer.Serialize(table));
+			File.Move(tempPath, fullPath, overwrite: true);
+		}
+		finally
+		{
+			if (File.Exists(tempPath))
+			{
+				File.Delete(tempPath);
+			}
+		}
 	}
 }
