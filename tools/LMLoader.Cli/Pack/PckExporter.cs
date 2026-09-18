@@ -40,7 +40,7 @@ public sealed class ProcessRunner : IProcessRunner
 }
 
 /// <summary>
-/// pck 导出(6.4):包装 <c>godot --headless --path &lt;工程&gt; --export-pack &lt;预设&gt; &lt;输出&gt;</c>(D10;
+/// pck 导出:包装 <c>godot --headless --path &lt;工程&gt; --export-pack &lt;预设&gt; &lt;输出&gt;</c>(
 /// 与 AGENTS.md 沉淀的手工命令一致)。Godot 可执行文件路径经参数/环境变量 GODOT_EXECUTABLE 提供。
 /// </summary>
 public sealed class PckExporter(IProcessRunner? runner = null)

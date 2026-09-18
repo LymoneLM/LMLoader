@@ -20,10 +20,10 @@ public override void _Ready()
 
 ## 运行期访问
 
-- `loader.Services` —— 跨模组服务注册表(D4)
+- `loader.Services` —— 跨模组服务注册表
 - `loader.LastLoadResult.SummaryText` —— 加载汇总报告
-- `loader.GetModMountPoint(modUid)` —— 模组挂载点(D5)
-- `LmScene.NodeAdded / NodeRemoved / SceneChanged` —— 场景级事件桥(D5)
+- `loader.GetModMountPoint(modUid)` —— 模组挂载点
+- `LmScene.NodeAdded / NodeRemoved / SceneChanged` —— 场景级事件桥
 
 ## 许可
 

@@ -3,7 +3,7 @@
   <!-- 公共属性见根目录 Directory.Build.props -->
   <PropertyGroup>
     <PackageId>LMLoader.Api</PackageId>
-    <Description>LMLoader mod API: module base class, lifecycle hooks, cross-mod services and config declaration surface. The only LMLoader reference a mod project needs (D13).</Description>
+    <Description>LMLoader mod API: module base class, lifecycle hooks, cross-mod services and config declaration surface. The only LMLoader reference a mod project needs.</Description>
     <PackageTags>godot;modding;mod-api;modloader</PackageTags>
   </PropertyGroup>
 

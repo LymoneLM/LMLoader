@@ -9,7 +9,7 @@ return Args.ParseAndRun(args);
 internal static class Args
 {
 	private const string Usage = """
-		LMLoader.Cli — mod 作者侧工具(6.4)
+		LMLoader.Cli — mod 作者侧工具
 
 		用法:
 		  lmcli lint      --dir <mod目录>
@@ -17,8 +17,8 @@ internal static class Args
 		  lmcli pack-ts   --dir <mod目录> --team <Thunderstore团队> [--output <zip路径>] [--deps-root <mods根目录>]
 
 		说明:
-		  pack-pck 包装 `godot --headless --export-pack`(D10);pack-ts 生成 Thunderstore 包
-		  (根含 manifest.json + icon.png + 模组文件;mod.json 一并打入,解压即原生格式,D16)。
+		  pack-pck 包装 `godot --headless --export-pack`;pack-ts 生成 Thunderstore 包
+		  (根含 manifest.json + icon.png + 模组文件;mod.json 一并打入,解压即原生格式)。
 		  依赖映射:pack-ts 经 --deps-root 扫描依赖模组的 mod.json 提供别名;缺省时依赖条目省略(警告)。
 		""";
 

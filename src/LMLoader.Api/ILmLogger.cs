@@ -3,7 +3,7 @@
 namespace LMLoader.Api;
 
 /// <summary>
-/// per-mod 日志接口(D6:日志是 Abstractions 表面的一部分,自研轻量实现,零第三方依赖)。
+/// per-mod 日志接口(自研轻量实现,零第三方依赖)。
 /// 实现方只需实现 <see cref="Log"/>;便捷方法为默认接口方法。
 /// </summary>
 public interface ILmLogger

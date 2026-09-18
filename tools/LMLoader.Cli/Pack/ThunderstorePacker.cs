@@ -10,7 +10,7 @@ namespace LMLoader.Cli.Pack;
 public sealed record ThunderstorePackResult(string ZipPath, string ManifestName, string VersionNumber);
 
 /// <summary>
-/// Thunderstore 包打包(6.4,D16):模组目录全量进 zip(含 mod.json——loader 在
+/// Thunderstore 包打包:模组目录全量进 zip(含 mod.json——loader 在
 /// Workshop/解压目录按 mod.json 发现,Thunderstore 包解压后即原生格式)+ 根目录生成
 /// manifest.json(经 <see cref="ThunderstoreAdapter"/>)。
 /// 平台硬约束:根目录必须含 icon.png(缺失/非 png → 打包失败)。

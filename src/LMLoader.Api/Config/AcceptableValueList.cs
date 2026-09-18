@@ -2,7 +2,7 @@
 
 namespace LMLoader.Api.Config;
 
-/// <summary>枚举取值列表:列表外的值不可钳制,一律回退默认值并警告(D11 宽容语义)。T 可为数值或字符串。</summary>
+/// <summary>枚举取值列表:列表外的值不可钳制,一律回退默认值并警告。T 可为数值或字符串。</summary>
 public sealed class AcceptableValueList<T> : AcceptableValueBase where T : notnull
 {
 	public AcceptableValueList(params T[] values)

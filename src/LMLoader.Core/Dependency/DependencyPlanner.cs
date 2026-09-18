@@ -6,14 +6,14 @@ using LMLoader.Core.Versioning;
 namespace LMLoader.Core.Dependency;
 
 /// <summary>
-/// 依赖图构建 + 模块级拓扑排序(草稿"依赖与加载顺序";依赖唯一来源为 mod.json,D2)。
+/// 依赖图构建 + 模块级拓扑排序(依赖唯一来源为 mod.json)。
 /// 语义:
 /// - 以模块为节点(同一 Assembly 内的模块也互为节点);
 /// - 硬依赖缺失/版本不满足 → 该模块放弃加载,并级联跳过硬依赖它的模块;
 /// - 软依赖仅约束顺序:目标存在则保证排在其后,目标缺失/失败则解除约束;
 /// - 循环依赖 → 整批拒绝,输出完整依赖链;
-/// - 排序并列时以 UID 字典序 tie-break(D8),结果确定可复现;
-/// - 依赖版本 v1 仅精确匹配(区间语法阶段 5);模块依赖版本与其所属模组版本比对。
+/// - 排序并列时以 UID 字典序 tie-break,结果确定可复现;
+/// - 依赖版本按区间语义判定;模块依赖版本与其所属模组版本比对。
 /// </summary>
 public static class DependencyPlanner
 {
@@ -89,7 +89,7 @@ public static class DependencyPlanner
 						break;
 					}
 
-					// 阶段 5:区间语义优先(Range 非空);裸精确声明走 Version 字段(旧清单兼容)
+					// 区间语义优先(Range 非空);裸精确声明走 Version 字段(旧清单兼容)
 					if (dependency.Range is { } range && !range.Contains(target.Mod.Version))
 					{
 						Fail(active, removalCause, skipped, node,
@@ -122,7 +122,7 @@ public static class DependencyPlanner
 			}
 		}
 
-		// ---- 4. Kahn 拓扑排序,UID 字典序 tie-break(D8) ----
+		// ---- 4. Kahn 拓扑排序,UID 字典序 tie-break ----
 		var ready = new PriorityQueue<Node, string>(Comparer<string>.Create(string.CompareOrdinal));
 		foreach (var node in active.Values.Where(n => n.Remaining == 0))
 		{

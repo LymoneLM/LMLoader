@@ -25,7 +25,7 @@ public static class TestCompiler
 		// 使夹具可用任意框架类型;重复路径去重。
 		// 注意:非收集式共享 ALC 加载过的模组程序集会留在 GetAssemblies() 里,其临时目录
 		// 在测试结束后可能已删除(Linux 可删除已打开文件;Windows 因文件锁残留目录,
-		// 恰好掩盖过此问题,CI ubuntu 首跑实证)——必须过滤死路径。
+		// 恰好掩盖过此问题)——必须过滤死路径。
 		var references = AppDomain.CurrentDomain.GetAssemblies()
 			.Where(a => !a.IsDynamic && a.Location.Length > 0)
 			.Select(a => a.Location)

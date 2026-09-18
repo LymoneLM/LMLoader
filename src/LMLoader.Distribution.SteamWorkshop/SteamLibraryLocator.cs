@@ -5,7 +5,7 @@ using System.Text.RegularExpressions;
 namespace LMLoader.Distribution.SteamWorkshop;
 
 /// <summary>
-/// Steam 安装位置与库目录定位(D15):零 SDK 依赖。
+/// Steam 安装位置与库目录定位:零 SDK 依赖。
 /// Windows:注册表 <c>HKCU\Software\Valve\Steam\SteamPath</c> → 默认安装路径兜底;
 /// Linux:~/.steam/steam、~/.local/share/Steam;macOS:~/Library/Application Support/Steam。
 /// 多库根经 <c>steamapps/libraryfolders.vdf</c> 解析(Steam 根自身恒为第一个库)。
@@ -55,7 +55,7 @@ public static partial class SteamLibraryLocator
 
 	/// <summary>
 	/// 解析全部库根(Steam 根 + libraryfolders.vdf 中登记的各库);
-	/// vdf 缺失或不可解析时仅返回 Steam 根(vdf 为逆向格式,失败不放大——D15)。
+	/// vdf 缺失或不可解析时仅返回 Steam 根(vdf 为逆向格式,失败不放大)。
 	/// </summary>
 	public static IReadOnlyList<string> EnumerateLibraryRoots(IReadOnlyList<string> steamRoots)
 	{

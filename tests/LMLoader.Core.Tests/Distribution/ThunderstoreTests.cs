@@ -252,7 +252,7 @@ public class ThunderstoreAdapterTests
 			manifest, "Author", new Dictionary<string, ModManifest> { ["com.other.lib"] = dependency });
 
 		var dep = Assert.Single(ts.Dependencies);
-		Assert.Equal("TeamB-lib-2.0.0", dep); // 区间 ^2.0.0 → 闭下界 2.0.0(D16)
+		Assert.Equal("TeamB-lib-2.0.0", dep); // 区间 ^2.0.0 → 闭下界 2.0.0
 	}
 
 	[Fact]

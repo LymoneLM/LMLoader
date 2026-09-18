@@ -6,9 +6,9 @@ using LMLoader.Api.Config;
 namespace SampleB;
 
 /// <summary>
-/// 样例模块 B:硬依赖 com.lmloader.sample.main(D8 验证依赖序),
-/// OnPostLoad 经强类型直引通道消费 base 的 IClockService(D4),
-/// 独立配置文件 com.lmloader.sample.extra.toml(D11 per-mod 配置)。
+/// 样例模块 B:硬依赖 com.lmloader.sample.main(验证依赖排序),
+/// OnPostLoad 经强类型直引通道消费 base 的 IClockService,
+/// 独立配置文件 com.lmloader.sample.extra.toml(per-mod 配置)。
 /// 消费结果记录到静态属性供冒烟断言。
 /// </summary>
 public class SampleModuleB : LmModule

@@ -7,10 +7,10 @@ using LMLoader.Api;
 namespace LMLoader.Core.Loading;
 
 /// <summary>
-/// 模组程序集加载器(决策 D1):全部模组装进<b>单一共享非收集式</b> AssemblyLoadContext;
+/// 模组程序集加载器:全部模组装进<b>单一共享非收集式</b> AssemblyLoadContext;
 /// 公共库(HarmonyX/Tomlyn/LMLoader.Api)由 loader 统一供给,模组不得捆绑。
 /// 程序集解析回退顺序:共享注册表 → 游戏程序集 → 模组目录 → 默认上下文。
-/// (P0-1 实证:Godot 将游戏程序集装在自身 ALC,默认上下文按名不可达,须由游戏解析器显式返回。)
+/// (Godot 将游戏程序集装在自身 ALC,默认上下文按名不可达,须由游戏解析器显式返回。)
 /// </summary>
 public sealed class ModAssemblyLoader : IDisposable
 {
@@ -39,7 +39,7 @@ public sealed class ModAssemblyLoader : IDisposable
 		_gameAssemblyResolver = gameAssemblyResolver;
 		_context = new ModLoadContext(this);
 
-		// P3-20 排障:MonoMod 的动态代理经 Assembly.Load(byte[]) 落入默认上下文,其基类型
+		// 防御:MonoMod 的动态代理经 Assembly.Load(byte[]) 落入默认上下文时,其基类型
 		// (MonoMod.Utils/ILGeneratorProxy)会在默认上下文再解析出一份 MonoMod 分身,
 		// 与真实实例类型身份分裂 → 泛型约束校验失败(仅导出构建触发,Harmony #642)。
 		// 处理器把 detour 链程序集的解析重定向回已加载的真实实例,消除分身。
@@ -54,7 +54,7 @@ public sealed class ModAssemblyLoader : IDisposable
 		}
 	}
 
-	/// <summary>登记 loader 供给的公共库(D1:模组捆绑同名库将被忽略并告警)。</summary>
+	/// <summary>登记 loader 供给的公共库(模组捆绑同名库将被忽略并告警)。</summary>
 	public void RegisterSharedLibrary(Assembly assembly)
 	{
 		ArgumentNullException.ThrowIfNull(assembly);
@@ -67,7 +67,7 @@ public sealed class ModAssemblyLoader : IDisposable
 
 		lock (_gate)
 		{
-			// 同名库重复登记:保持先登记者(D1 先载入者胜的一致语义)
+			// 同名库重复登记:保持先登记者(与模组库"先载入者胜"一致)
 			if (!_sharedRegistry.TryAdd(simpleName, assembly))
 			{
 				_logger.Warn($"公共库 \"{simpleName}\" 重复登记,保留先登记版本");
@@ -147,7 +147,7 @@ public sealed class ModAssemblyLoader : IDisposable
 	}
 
 	/// <summary>
-	/// 模组目录重名捆绑扫描(D1):与公共库重名 → 告警(loader 版本胜);
+	/// 模组目录重名捆绑扫描:与公共库重名 → 告警(loader 版本胜);
 	/// 与先前模组捆绑库重名 → 告警(先载入者胜)。扫描到的捆绑库同时登记来源,
 	/// 使后续模组加载时的检测不依赖前一模组是否已实际触发该库的 JIT 加载。
 	/// </summary>
@@ -170,7 +170,7 @@ public sealed class ModAssemblyLoader : IDisposable
 			if (_sharedRegistry.ContainsKey(simpleName))
 			{
 				_logger.Warn(
-					$"模组 \"{modUid}\" 捆绑了公共库 \"{simpleName}\",loader 将统一供给该库,捆绑副本被忽略(D1);" +
+					$"模组 \"{modUid}\" 捆绑了公共库 \"{simpleName}\",loader 将统一供给该库,捆绑副本被忽略;" +
 					"请从模组依赖中移除 loader 公共库");
 				continue;
 			}
@@ -179,7 +179,7 @@ public sealed class ModAssemblyLoader : IDisposable
 			{
 				_logger.Warn(
 					$"程序集 \"{simpleName}\" 已由模组 \"{origin.ModUid}\" 先行提供," +
-					$"模组 \"{modUid}\" 的捆绑副本将被忽略(先载入者胜,D1);涉事模组: {origin.ModUid}, {modUid}");
+					$"模组 \"{modUid}\" 的捆绑副本将被忽略(先载入者胜);涉事模组: {origin.ModUid}, {modUid}");
 				continue;
 			}
 
@@ -201,7 +201,7 @@ public sealed class ModAssemblyLoader : IDisposable
 			return shared;
 		}
 
-		// 2) 游戏程序集(宿主环境注入的解析器;P0-1:默认上下文按名不可达)
+		// 2) 游戏程序集(宿主环境注入的解析器;默认上下文按名不可达)
 		if (_gameAssemblyResolver?.Invoke(assemblyName) is { } gameAssembly)
 		{
 			return gameAssembly;

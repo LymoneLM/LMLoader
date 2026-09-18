@@ -5,7 +5,7 @@ using LMLoader.Core.Versioning;
 namespace LMLoader.Core.Manifest;
 
 /// <summary>
-/// mod.json 清单模型(schema v0.1,决策 D9)。
+/// mod.json 清单模型(schema v1.0)。
 /// 由 <see cref="ModManifestReader"/> 构造;字段语义见 docs/mod-json-schema.md。
 /// </summary>
 public sealed class ModManifest
@@ -27,16 +27,16 @@ public sealed class ModManifest
 
 	public string? Website { get; init; }
 
-	/// <summary>展示用标签(v1.0 新增,D9 迭代);loader 本体不消费,供管理器/分发平台过滤。</summary>
+	/// <summary>展示用标签;loader 本体不消费,供管理器/分发平台过滤。</summary>
 	public IReadOnlyList<string> Tags { get; init; } = Array.Empty<string>();
 
-	/// <summary>分发平台别名(D16);loader 本体不消费,供打包器生成平台 manifest。缺省 null。</summary>
+	/// <summary>分发平台别名;loader 本体不消费,供打包器生成平台 manifest。缺省 null。</summary>
 	public ModDistribution? Distribution { get; init; }
 
-	/// <summary>目标游戏标识,与宿主游戏约定比对,不匹配拒载(D9)。</summary>
+	/// <summary>目标游戏标识,与宿主游戏约定比对,不匹配拒载。</summary>
 	public required string GameId { get; init; }
 
-	/// <summary>依赖的 LMLoader API 版本区间(阶段 5 起支持 ^ ~ 比较符等;裸精确版本天然兼容)。</summary>
+	/// <summary>依赖的 LMLoader API 版本区间(支持 ^ ~ 比较符等;裸精确版本天然兼容)。</summary>
 	public required VersionRange LoaderVersion { get; init; }
 
 	/// <summary>模组 DLL 文件名(相对模组目录)。</summary>
@@ -45,7 +45,7 @@ public sealed class ModManifest
 	/// <summary>模块列表(加载最小单位)。</summary>
 	public required IReadOnlyList<ModuleEntry> Modules { get; init; }
 
-	/// <summary>pck 资源路径(相对模组目录;早于逻辑加载,D10)。</summary>
+	/// <summary>pck 资源路径(相对模组目录;早于逻辑加载)。</summary>
 	public IReadOnlyList<string> PckResources { get; init; } = Array.Empty<string>();
 
 	/// <summary>mod.json 物理路径(诊断用)。</summary>
@@ -61,22 +61,22 @@ public sealed class ModuleEntry
 	/// <summary>模块 UID,全局唯一。</summary>
 	public required string Uid { get; init; }
 
-	/// <summary>模块类完整命名空间全名(须继承 LmModule;无命名空间的类无法被按名查找,P0-1)。</summary>
+	/// <summary>模块类完整命名空间全名(须继承 LmModule;无命名空间的类无法被按名查找)。</summary>
 	public required string Type { get; init; }
 
-	/// <summary>依赖声明(唯一来源,决策 D2)。</summary>
+	/// <summary>依赖声明(唯一来源)。</summary>
 	public IReadOnlyList<ModuleDependency> Depends { get; init; } = Array.Empty<ModuleDependency>();
 }
 
 /// <summary>模块依赖声明。<c>Version</c>/<c>Range</c> 二选一:区间为 null 时保留精确语义(旧清单兼容)。</summary>
 public sealed record ModuleDependency(string Uid, SemVer? Version, bool Soft)
 {
-	/// <summary>版本区间声明(阶段 5);解析失败或未声明为 null(此时回退 <see cref="Version"/>)。</summary>
+	/// <summary>版本区间声明;解析失败或未声明为 null(此时回退 <see cref="Version"/>).</summary>
 	public VersionRange? Range { get; init; }
 }
 
 /// <summary>
-/// 分发平台别名声明(D16)。UID 为运行时唯一身份;此处仅为打包器向分发平台映射身份提供显式来源。
+/// 分发平台别名声明。UID 为运行时唯一身份;此处仅为打包器向分发平台映射身份提供显式来源。
 /// Thunderstore:name 缺省 = UID 尾段(`.`→`_`);team 无缺省(打包时缺失报错)。
 /// </summary>
 public sealed record ModDistribution(string? ThunderstoreTeam, string? ThunderstoreName = null);

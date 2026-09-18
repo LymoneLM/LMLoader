@@ -13,7 +13,7 @@ using LMLoader.GodotBridge.SceneTreeEvents;
 namespace LMLoader.GodotBridge.Autoload;
 
 /// <summary>
-/// LMLoader 引导节点(决策 D5):内嵌接入的 Godot 侧入口。
+/// LMLoader 引导节点:内嵌接入的 Godot 侧入口。
 /// 入树(_Ready)即执行:扫描 mods → 依赖规划 → 挂载 pck(AfterPlan 回调,pck 早于逻辑)→
 /// 生命周期 → 建立 <c>LMLoader/Mods/&lt;modUid&gt;</c> 挂载点树(仅加载成功的模组)。
 /// 接入方式:游戏侧在自己代码中 <c>new LMLoaderAutoload() { GameId = "..." }</c> 后
@@ -26,7 +26,7 @@ public partial class LMLoaderAutoload : Node
 
 	private ModManager? _modManager;
 
-	/// <summary>宿主游戏标识(gameId 过滤,D9);入树前设置。</summary>
+	/// <summary>宿主游戏标识(gameId 过滤);入树前设置。</summary>
 	public string GameId { get; set; } = "";
 
 	/// <summary>mods 根目录覆盖;缺省 <c>res://mods</c> 全局化路径。入树前设置。</summary>
@@ -36,7 +36,7 @@ public partial class LMLoaderAutoload : Node
 	public Version? ApiVersion { get; set; }
 
 	/// <summary>
-	/// 游戏程序集解析器(P0-1:游戏程序集在宿主自身 ALC;模组要 patch 游戏方法时必需)。
+	/// 游戏程序集解析器(游戏程序集在宿主自身 ALC;模组要 patch 游戏方法时必需)。
 	/// 嵌入模式典型实现:<c>n => n.Name == "我的游戏程序集名" ? typeof(入口类型).Assembly : null</c>。入树前设置。
 	/// </summary>
 	public Func<AssemblyName, Assembly?>? GameAssemblyResolver { get; set; }
@@ -44,13 +44,13 @@ public partial class LMLoaderAutoload : Node
 	/// <summary>最近一次加载结果;未加载(无 mods 目录)时为 null。</summary>
 	public LoadResult? LastLoadResult { get; private set; }
 
-	/// <summary>跨模组服务注册表(D4)。</summary>
+	/// <summary>跨模组服务注册表。</summary>
 	public ServiceRegistry? Services => _modManager?.Services;
 
-	/// <summary>内存环形日志缓冲(D6);日志窗口数据源,宿主可另接 UI。</summary>
+	/// <summary>内存环形日志缓冲;日志窗口数据源,宿主可另接 UI。</summary>
 	public RingBufferLogSink? LogBuffer => _logBuffer;
 
-	/// <summary>配置协调器(D11);未引导或未启用配置时为 null(热重载已随引导开启)。</summary>
+	/// <summary>配置协调器;未引导或未启用配置时为 null(热重载已随引导开启)。</summary>
 	public LMLoader.Core.Config.ConfigManager? Configs => _modManager?.Configs;
 
 	private Node? _modsMountRoot;
@@ -86,9 +86,9 @@ public partial class LMLoaderAutoload : Node
 	private void Boot()
 	{
 		Instance = this;
-		Name = "LMLoader"; // 固定挂载点树根名(D5):/root/LMLoader/Mods/<modUid>
+		Name = "LMLoader"; // 固定挂载点树根名:/root/LMLoader/Mods/<modUid>
 
-		// D6:Godot 控制台 + 内存环形缓冲(日志窗口) + 文件(user://logs);级别 Debug 便于模组排障
+		// 三个 sink:Godot 控制台 + 内存环形缓冲(日志窗口) + 文件(user://logs);级别 Debug 便于模组排障
 		var router = new LoggerRouter { MinimumLevel = LmLogLevel.Debug };
 		router.AddSink(new GodotLogSink());
 		_logBuffer = new RingBufferLogSink();
@@ -118,7 +118,7 @@ public partial class LMLoaderAutoload : Node
 			ApiVersion = ApiVersion,
 			GameAssemblyResolver = GameAssemblyResolver,
 			AfterPlan = plan => PckMounter.MountInPlanOrder(plan, logger),
-			ConfigRootPath = ProjectSettings.GlobalizePath("user://configs"), // D11 硬约束:Steam 环境游戏目录不可写
+			ConfigRootPath = ProjectSettings.GlobalizePath("user://configs"), // Steam 环境游戏目录不可写,配置必须落 user://
 		}, router);
 
 		LastLoadResult = _modManager.LoadAll();
@@ -170,7 +170,7 @@ public partial class LMLoaderAutoload : Node
 		}
 	}
 
-	/// <summary>取模组私有挂载点(D5);模组加载成功后可用,否则 null。</summary>
+	/// <summary>取模组私有挂载点;模组加载成功后可用,否则 null。</summary>
 	public Node? GetModMountPoint(string modUid) =>
 		_modsMountRoot?.GetNodeOrNull(SanitizeNodeName(modUid));
 

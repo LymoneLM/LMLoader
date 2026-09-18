@@ -5,7 +5,7 @@ using LMLoader.Api;
 namespace LMLoader.Core.Config;
 
 /// <summary>
-/// 配置热重载监听(D11):监视配置根目录的 *.toml,按路径防抖(默认 500ms)后触发
+/// 配置热重载监听:监视配置根目录的 *.toml,按路径防抖(默认 500ms)后触发
 /// <see cref="ConfigManager.ReloadFromFile"/>。
 /// FileSystemWatcher 不保证事件送达(MS 文档明示,实测存在丢失/秒级延迟),故叠加
 /// 周期性 mtime 兜底扫描(默认 2s)作为第二变更来源,两条路径经同一防抖合并。
@@ -138,7 +138,7 @@ public sealed class ConfigWatcher : IDisposable
 		}
 		catch (Exception ex)
 		{
-			// 单次重载失败不放大(D7):文件仍在,下次变更可重试
+			// 单次重载失败不放大:文件仍在,下次变更可重试
 			_logger.Warn($"配置热重载失败({fullPath}): {ex.Message}");
 		}
 	}

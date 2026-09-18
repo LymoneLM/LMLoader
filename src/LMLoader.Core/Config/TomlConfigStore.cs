@@ -6,13 +6,13 @@ using Tomlyn.Model;
 namespace LMLoader.Core.Config;
 
 /// <summary>
-/// TOML 配置文件存取(D11):每个模组一份 <c>&lt;配置根目录&gt;/&lt;modUid&gt;.toml</c>。
+/// TOML 配置文件存取:每个模组一份 <c>&lt;配置根目录&gt;/&lt;modUid&gt;.toml</c>。
 /// 根目录由宿主提供(见 <see cref="LoaderOptions.ConfigRootPath"/>),Core 不感知 user:// 语义。
-/// 文件缺失视为空配置(首次运行常态);解析错误上抛,由上层按 D11 宽容语义处置。
+/// 文件缺失视为空配置(首次运行常态);解析错误上抛,由上层宽容处置。
 /// </summary>
 public class TomlConfigStore
 {
-	/// <summary>模组配置文件路径约定(D11);uid 经清单校验为反向域名,此处仅防御路径分隔符。</summary>
+	/// <summary>模组配置文件路径约定;uid 经清单校验为反向域名,此处仅防御路径分隔符。</summary>
 	public static string GetConfigFilePath(string rootPath, string modUid)
 	{
 		ArgumentException.ThrowIfNullOrWhiteSpace(rootPath);

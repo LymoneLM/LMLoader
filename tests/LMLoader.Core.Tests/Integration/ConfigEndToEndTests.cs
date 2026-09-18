@@ -4,7 +4,7 @@ using LMLoader.Core.Tests.TestInfrastructure;
 namespace LMLoader.Core.Tests.Integration;
 
 /// <summary>
-/// 4.3 端到端:真实模组 OnPreLoad 绑定配置 → ConfigManager 按 D11 合并磁盘 toml →
+/// 端到端:真实模组 OnPreLoad 绑定配置 → ConfigManager 合并磁盘 toml →
 /// OnLoad 读到生效值;缺失键写回默认;同模组多模块共享一份配置文件。
 /// </summary>
 public class ConfigEndToEndTests : IDisposable

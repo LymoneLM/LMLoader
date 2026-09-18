@@ -5,7 +5,7 @@ using LMLoader.Core.Manifest;
 namespace LMLoader.Distribution.SteamWorkshop;
 
 /// <summary>
-/// Workshop 订阅模组扫描(D15):候选内容目录 → 存在 mod.json 者为发现根;
+/// Workshop 订阅模组扫描:候选内容目录 → 存在 mod.json 者为发现根;
 /// ACF(<c>appworkshop_&lt;appid&gt;.acf</c>)做机会性孤儿过滤——解析成功时剔除未安装条目,
 /// 失败/缺失一律放行(逆向格式不受保护,永不依赖)。
 /// </summary>

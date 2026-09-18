@@ -17,6 +17,6 @@ public sealed class LoadResult
 	/// <summary>生命周期结果;整批拒绝(循环依赖)时为 null。</summary>
 	public Lifecycle.LifecycleReport? Lifecycle { get; init; }
 
-	/// <summary>人可读加载汇总(D7)。</summary>
+	/// <summary>人可读加载汇总。</summary>
 	public required string SummaryText { get; init; }
 }

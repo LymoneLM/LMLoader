@@ -170,7 +170,7 @@ public class ModAssemblyLoaderTests : IDisposable
 			}
 			""", gameDll);
 
-		// 模拟 P0-1 实证环境:游戏程序集位于宿主自身 ALC,loader 须按名显式返回
+		// 模拟宿主环境:游戏程序集位于宿主自身 ALC,loader 须按名显式返回
 		var gameAssembly = Assembly.LoadFrom(gameDll);
 		using var loader = new ModAssemblyLoader(
 			new RecordingLogger(),

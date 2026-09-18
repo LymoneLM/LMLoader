@@ -6,7 +6,7 @@ using LMLoader.Api;
 namespace LMLoader.Core.Logging;
 
 /// <summary>
-/// 日志中枢(D6):持有 sink 集合,按模组发放 <see cref="ILmLogger"/>,统一过滤最低级别。
+/// 日志中枢:持有 sink 集合,按模组发放 <see cref="ILmLogger"/>,统一过滤最低级别。
 /// 线程安全:sink 列表快照 + per-mod logger 缓存。
 /// </summary>
 public sealed class LoggerRouter

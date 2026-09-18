@@ -5,7 +5,7 @@ using Godot;
 namespace LMLoader.GodotBridge.SceneTreeEvents;
 
 /// <summary>
-/// SceneTree 信号 → C# 事件桥(D5:模组订阅游戏级时机,loader 只做桥接;不造 tick 抽象,
+/// SceneTree 信号 → C# 事件桥(模组订阅游戏级时机,loader 只做桥接;不造 tick 抽象,
 /// 逐帧逻辑直接用 Godot 原生 Node)。
 /// </summary>
 public sealed class SceneTreeEventBridge

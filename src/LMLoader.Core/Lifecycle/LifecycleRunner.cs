@@ -10,7 +10,7 @@ using LMLoader.Core.Logging;
 namespace LMLoader.Core.Lifecycle;
 
 /// <summary>
-/// 生命周期执行器(D7 宽松失败传播):
+/// 生命周期执行器(宽松失败传播):
 /// - 三阶段批处理:PreLoad(全部) → Load(全部) → PostLoad(仅 PreLoad/Load 成功者);
 ///   程序集加载与实例化内联于 PreLoad 阶段,级联跳过的模块不产生实例;
 /// - 全部 hook 边界 try/catch,单模块异常不杀游戏、不阻塞无依赖模块;
@@ -19,10 +19,10 @@ namespace LMLoader.Core.Lifecycle;
 /// </summary>
 public sealed class LifecycleRunner
 {
-	/// <summary>loader 自身日志的 modUid 标识(D6:日志按模组划分,loader 视为特殊模组)。</summary>
+	/// <summary>loader 自身日志的 modUid 标识(日志按模组划分,loader 视为特殊模组)。</summary>
 	public const string LoaderLogUid = "LMLoader";
 
-	private const string StrictAbortNote = "strict 模式:前序模块失败,中止加载(D7 预留开关)";
+	private const string StrictAbortNote = "strict 模式:前序模块失败,中止加载";
 
 	private readonly ModAssemblyLoader _assemblyLoader;
 	private readonly LoggerRouter _loggerRouter;
@@ -88,7 +88,7 @@ public sealed class LifecycleRunner
 			}
 		}
 
-		// ---- 配置合并(D11):PreLoad 声明完毕后、OnLoad 之前读入磁盘值 ----
+		// ---- 配置合并:PreLoad 声明完毕后、OnLoad 之前读入磁盘值 ----
 		_configManager?.ApplyAfterPreLoad(_modConfigs.ToList());
 
 		// ---- Load ----
@@ -131,7 +131,7 @@ public sealed class LifecycleRunner
 				// 已成功 Load 者保留成功状态,仅记录 PostLoad 未执行
 				if (state.LoadDone && state.FailedStage is null)
 				{
-					state.Note ??= "strict 中止:PostLoad 未执行(D7 预留开关)";
+					state.Note ??= "strict 中止:PostLoad 未执行";
 				}
 
 				continue;
@@ -300,7 +300,7 @@ public sealed class LifecycleRunner
 
 		public LmModule? Instance { get; set; }
 
-		/// <summary>模块配置声明面(D11);实例化时创建,4.3 起在 PreLoad 后合并磁盘值。</summary>
+		/// <summary>模块配置声明面;实例化时创建,PreLoad 后合并磁盘值。</summary>
 		public Api.Config.ModConfig? Config { get; set; }
 
 		public LifecycleStage CurrentStage { get; set; } = LifecycleStage.AssemblyLoad;

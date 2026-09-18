@@ -6,7 +6,7 @@ using LMLoader.GodotBridge.Autoload;
 namespace LMLoader.Embedded;
 
 /// <summary>
-/// 内嵌版初始化入口(草稿"内嵌版:开发者一行代码接入")。
+/// 内嵌版初始化入口:开发者一行代码接入。
 /// 在游戏入口代码(主场景 _Ready / 既有 Autoload)中调用 <see cref="Initialize"/>;
 /// 引导节点经延迟添加入树,入树即开始加载流程(扫描 → 规划 → 挂载 pck → 模组生命周期),
 /// 完成时机经 <see cref="LMLoaderAutoload.BootCompleted"/> 事件通知。

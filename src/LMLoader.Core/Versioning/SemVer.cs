@@ -5,7 +5,7 @@ using System.Globalization;
 namespace LMLoader.Core.Versioning;
 
 /// <summary>
-/// SemVer 2.0.0 版本值(草稿"内置以SemVer为基准的版本管理体系")。
+/// SemVer 2.0.0 版本值。
 /// 严格解析:禁止前导零、空标识符与非法字符。
 /// 排序与相等遵循规范优先级规则:<see cref="Build"/> 不参与(规范:build metadata 不影响 precedence)。
 /// </summary>

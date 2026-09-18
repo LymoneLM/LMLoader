@@ -1,7 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
   <!-- 公共属性见根目录 Directory.Build.props(TFM 继承 net8.0)。
-       mod 作者侧工具:mod.json lint 校验 + pck 导出包装 + Thunderstore 打包(6.4)。 -->
+       mod 作者侧工具:mod.json lint 校验 + pck 导出包装 + Thunderstore 打包。 -->
   <PropertyGroup>
     <OutputType>Exe</OutputType>
     <RollForward>LatestMajor</RollForward>

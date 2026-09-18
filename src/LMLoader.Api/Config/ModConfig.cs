@@ -4,7 +4,7 @@ namespace LMLoader.Api.Config;
 
 /// <summary>
 /// 模组配置声明面:在 <c>OnPreLoad</c> 阶段调用 <see cref="Bind{T}"/> 声明配置项及默认值,
-/// Core 随后按 D11 合并 <c>&lt;配置根&gt;/&lt;modUid&gt;.toml</c>(缺失键补默认写回、孤儿键保留、
+/// Core 随后合并 <c>&lt;配置根&gt;/&lt;modUid&gt;.toml</c>(缺失键补默认写回、孤儿键保留、
 /// 类型不符回退默认并警告)。同键重复绑定返回同一实例;实例化后即可安全读取 <c>Value</c>。
 /// </summary>
 public sealed class ModConfig
@@ -31,7 +31,7 @@ public sealed class ModConfig
 		{
 			throw new InvalidOperationException(
 				"配置合并已完成(PreLoad 阶段结束),此声明不会写回文件也不会读入用户值;" +
-				"请在 OnPreLoad 中调用 Bind(D11)");
+				"请在 OnPreLoad 中调用 Bind");
 		}
 		if (section is null)
 		{

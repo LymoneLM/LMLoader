@@ -6,7 +6,7 @@ using LMLoader.Core.Versioning;
 namespace LMLoader.Core.Manifest;
 
 /// <summary>
-/// mod.json 读取器(schema v0.1,决策 D9)。
+/// mod.json 读取器(schema v1.0)。
 /// 容错语义:未知字段忽略+警告;schemaVersion 主版本不识别拒载;错误累积返回(不抛出)。
 /// </summary>
 public static class ModManifestReader
@@ -65,7 +65,7 @@ public static class ModManifestReader
 
 			var properties = CollectUniqueProperties(root, "", warnings);
 
-			// schemaVersion:主版本不识别 → 拒载(D9)
+			// schemaVersion:主版本不识别 → 拒载
 			if (!TryGetRequiredInt(properties, "schemaVersion", errors, out var schemaVersion))
 			{
 				return ManifestReadResult.Fail(errors, warnings);
@@ -91,7 +91,7 @@ public static class ModManifestReader
 			var description = GetOptionalString(properties, "description");
 			var icon = GetOptionalString(properties, "icon");
 			var website = GetOptionalString(properties, "website");
-			var tags = ReadStringArray(properties, "tags", warnings); // v1.0:展示字段(D9 迭代)
+			var tags = ReadStringArray(properties, "tags", warnings); // 展示字段
 			var distribution = ReadDistribution(properties, errors, warnings);
 
 			if (okUid && !IsValidUid(uid))
@@ -231,7 +231,7 @@ public static class ModManifestReader
 
 			if (!type.Contains('.'))
 			{
-				// P0-1:按字符串查类型须用完整命名空间全名,无命名空间类会被漏掉
+				// 按字符串查类型须用完整命名空间全名,无命名空间类会被漏掉
 				errors.Add($"{path}.type: \"{type}\" 必须为完整命名空间全名(无命名空间的类无法被按名查找)");
 			}
 
@@ -297,7 +297,7 @@ public static class ModManifestReader
 				if (versionElement.ValueKind == JsonValueKind.String)
 				{
 					var versionText = versionElement.GetString() ?? "";
-					// 阶段 5:优先按区间解析(^ ~ 比较符);裸精确版本两者皆可,区间保留原语法
+					// 优先按区间解析(^ ~ 比较符);裸精确版本两者皆可,区间保留原语法
 					if (VersionRange.TryParse(versionText, out var parsedRange))
 					{
 						range = parsedRange;
@@ -384,7 +384,7 @@ public static class ModManifestReader
 		return result.ToArray();
 	}
 
-	/// <summary>枚举对象属性;重复键警告(取最后出现的值);未知键警告(宽容读入,D9)。</summary>
+	/// <summary>枚举对象属性;重复键警告(取最后出现的值);未知键警告(宽容读入)。</summary>
 	private static Dictionary<string, JsonElement> CollectUniqueProperties(
 		JsonElement element,
 		string path,
@@ -431,7 +431,7 @@ public static class ModManifestReader
 					_ => Array.Empty<string>(),
 				};
 
-	/// <summary>读入 distribution(D16 分发别名);结构不对仅警告并忽略(loader 不消费此字段)。</summary>
+	/// <summary>读入 distribution(分发别名);结构不对仅警告并忽略(loader 不消费此字段)。</summary>
 	private static ModDistribution? ReadDistribution(
 		Dictionary<string, JsonElement> properties, List<string> errors, List<string> warnings)
 	{
@@ -566,7 +566,7 @@ public static class ModManifestReader
 	private static string FormatVersionError(string field, string text)
 	{
 		var hint = text.IndexOfAny(['<', '>', '^', '~', '*', ',', ' ']) >= 0
-			? ";区间语法(^ ~ >= < 等)将在阶段 5 支持,v1 加载器仅接受精确版本"
+			? ";支持 ^ ~ >= < 等区间语法与精确版本"
 			: "";
 		return $"{field}: \"{text}\" 不是合法的 SemVer 版本串{hint}";
 	}
@@ -590,7 +590,7 @@ public static class ModManifestReader
 		}
 
 		// Windows 盘符路径(C:\、C:/)在任何平台都算绝对:清单应跨平台可移植
-		// (Path.IsPathRooted("C:/x") 在 Linux 返回 false,CI ubuntu 首跑实证)
+		// (Path.IsPathRooted("C:/x") 在 Linux 返回 false,盘符路径必须显式拒绝)
 		if (path.Length >= 2 && path[1] == ':' && char.IsAsciiLetter(path[0]))
 		{
 			return false;

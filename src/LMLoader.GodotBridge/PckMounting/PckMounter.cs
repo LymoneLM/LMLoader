@@ -7,11 +7,11 @@ using LMLoader.Core.Dependency;
 namespace LMLoader.GodotBridge.PckMounting;
 
 /// <summary>
-/// pck 扫描与挂载(决策 D10):
+/// pck 扫描与挂载:
 /// - 挂载顺序 = 模块拓扑序(加载顺序即优先级);
 /// - 后挂载覆盖( Godot 原生语义,replaceFiles: true),运行时不做重叠检测;
-/// - 资源路径约定 <c>res://mods/&lt;uid&gt;/</c> 由清单与打包侧保证,CLI lint 兜底(阶段 6);
-/// - pck 早于模块逻辑加载(草稿:按序加载 pck,早于逻辑)。
+/// - 资源路径约定 <c>res://mods/&lt;uid&gt;/</c> 由清单与打包侧保证,CLI lint 兜底;
+/// - pck 早于模块逻辑加载。
 /// </summary>
 public static class PckMounter
 {
@@ -42,7 +42,7 @@ public static class PckMounter
 				}
 				else
 				{
-					// 单点失败不放大(D7):记录后继续,不阻断加载
+					// 单点失败不放大:记录后继续,不阻断加载
 					logger.Error($"模组 \"{item.ModUid}\" 的 pck 挂载失败: {pck}");
 				}
 			}

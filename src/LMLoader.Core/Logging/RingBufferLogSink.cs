@@ -3,7 +3,7 @@
 namespace LMLoader.Core.Logging;
 
 /// <summary>
-/// 内存环形缓冲 sink(D6):固定容量,超限丢弃最旧;供日志窗口/崩溃回放读取最近事件。线程安全。
+/// 内存环形缓冲 sink:固定容量,超限丢弃最旧;供日志窗口/崩溃回放读取最近事件。线程安全。
 /// </summary>
 public sealed class RingBufferLogSink : ILogSink
 {

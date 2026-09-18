@@ -6,12 +6,12 @@ using LMLoader.Core.Versioning;
 namespace LMLoader.Distribution.Thunderstore;
 
 /// <summary>
-/// mod.json ↔ Thunderstore manifest 转换(D16):
+/// mod.json ↔ Thunderstore manifest 转换:
 /// - 身份:包名 = distribution.thunderstore.name,缺省 UID 尾段;team 必须显式声明,缺失即抛错(显式优于猜测);
 /// - 版本:version → version_number;含 prerelease/build 时报错(平台不支持);
 /// - 依赖:遍历依赖清单,经依赖各自 mod.json 的别名生成 <c>Team-Name-精确版本</c>;版本取声明区间下界(闭端),
 ///   开下界(<c>&gt;v</c>)或无界且声明精确版本缺失时报错;依赖无别名 → 警告并跳过该条;
-/// - 逆向:平台 manifest 不回写 mod.json——zip 内含 mod.json 的包直接以 UID 为身份(D16 逆向规则)。
+/// - 逆向:平台 manifest 不回写 mod.json——zip 内含 mod.json 的包直接以 UID 为身份。
 /// </summary>
 public static class ThunderstoreAdapter
 {
@@ -101,7 +101,7 @@ public static class ThunderstoreAdapter
 		return null;
 	}
 
-	/// <summary>版本解析:区间下界(闭端)/精确版本;开下界、无界或 prerelease 报错(D16)。</summary>
+	/// <summary>版本解析:区间下界(闭端)/精确版本;开下界、无界或 prerelease 报错。</summary>
 	private static string ResolveExactVersion(ModManifest mod, ModuleDependency dependency, string depUid)
 	{
 		if (dependency.Range is { } range)

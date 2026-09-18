@@ -8,7 +8,7 @@ namespace LMLoader.Distribution.Thunderstore;
 
 /// <summary>
 /// Thunderstore manifest.json 模型(平台 Schema v1)。
-/// 与本格式 <see cref="ModManifest"/> 的转换规则见 <see cref="ThunderstoreAdapter"/>(D16)。
+/// 与本格式 <see cref="ModManifest"/> 的转换规则见 <see cref="ThunderstoreAdapter"/>。
 /// </summary>
 public sealed class ThunderstoreManifest
 {

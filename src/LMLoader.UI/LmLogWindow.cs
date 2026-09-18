@@ -7,7 +7,7 @@ using LMLoader.Core.Logging;
 namespace LMLoader.UI;
 
 /// <summary>
-/// 日志窗口(可选组件,任务 4.6):两个页签——「日志」轮询展示 <see cref="RingBufferLogSink"/>
+/// 日志窗口(可选组件):两个页签——「日志」轮询展示 <see cref="RingBufferLogSink"/>
 /// 最近事件并支持按最低级别过滤(分级查看);「加载报告」展示加载汇总文本。
 /// 类型经代码 <c>new</c> 创建(不注册 Godot 脚本),宿主决定何时打开/切换。
 /// </summary>

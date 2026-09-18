@@ -5,7 +5,7 @@ using System.Globalization;
 namespace LMLoader.Core.Versioning;
 
 /// <summary>
-/// 版本区间(阶段 5,D9 迭代):语法——
+/// 版本区间语法:
 /// <list type="bullet">
 /// <item><c>*</c>:任意版本(缺省等价)</item>
 /// <item><c>^M.m.p</c>:同主版本兼容区 <c>[M.m.p, (M+1).0.0)</c>;主版本为 0 时按次版本收口 <c>[0.m.p, 0.(m+1).0)</c>(0.x 生态惯例)</item>

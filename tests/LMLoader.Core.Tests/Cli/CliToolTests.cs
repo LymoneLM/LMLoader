@@ -6,7 +6,7 @@ using LMLoader.Distribution.Thunderstore;
 
 namespace LMLoader.Core.Tests.Cli;
 
-/// <summary>ModLinter 严格校验:运行时"宽容忽略"的行为在这里必须是 error(6.4)。</summary>
+/// <summary>ModLinter 严格校验:运行时"宽容忽略"的行为在这里必须是 error。</summary>
 [Trait("Category", "UsesFileSystem")]
 public class ModLinterTests : IDisposable
 {
@@ -274,7 +274,7 @@ public class PckExporterTests : IDisposable
 	}
 }
 
-/// <summary>ThunderstorePacker:zip 布局按 D16(manifest.json 根置 + mod.json 一并打入 + icon.png 必须)。</summary>
+/// <summary>ThunderstorePacker:zip 布局(manifest.json 根置 + mod.json 一并打入 + icon.png 必须)。</summary>
 [Trait("Category", "UsesFileSystem")]
 public class ThunderstorePackerTests : IDisposable
 {

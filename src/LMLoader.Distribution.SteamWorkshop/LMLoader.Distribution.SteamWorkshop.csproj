@@ -1,7 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
   <!-- 公共属性见根目录 Directory.Build.props。
-       Workshop 订阅发现(D15):目录扫描为唯一发现路径;Steamworks API 不做依赖;
+       Workshop 订阅发现:目录扫描为唯一发现路径;Steamworks API 不做依赖;
        ACF 仅作机会性孤儿过滤。Windows 注册表经 Microsoft.Win32.Registry(非 Windows 运行时静默跳过)。 -->
   <ItemGroup>
     <PackageReference Include="Microsoft.Win32.Registry" />

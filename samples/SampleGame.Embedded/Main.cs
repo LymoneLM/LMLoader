@@ -16,7 +16,7 @@ public partial class Main : Node
 	/// <summary>样例目标:被模组 patch 的静态方法(原语义 1+2=3;模组 prefix 改写为 100)</summary>
 	public static int Add(int a, int b) => a + b;
 
-	/// <summary>样例目标:被模组 postfix 的 _Process 命中计数(引擎 native→managed 路径,P0-1 核心风险点)</summary>
+	/// <summary>样例目标:被模组 postfix 的 _Process 命中计数(引擎 native→managed 路径)</summary>
 	public static int ProcessPatchHits;
 
 	public override void _Process(double delta)
@@ -25,12 +25,12 @@ public partial class Main : Node
 
 	public override void _Ready()
 	{
-		// 一行接入(D5/D7 能力经 loader 节点访问)
+		// 一行接入;能力经 loader 节点访问
 		var loader = LMLoaderEmbedded.Initialize(GetTree(), l =>
 		{
 			l.GameId = "com.lmloader.samplegame";
 			l.ApiVersion = new Version(1, 0, 0); // 样例自定基线;缺省取 LMLoader.Api 程序集版本
-			// P0-1:游戏程序集在宿主自身 ALC,须按名显式供给模组(嵌入模式由入口程序集自供)
+			// 游戏程序集在宿主自身 ALC,须按名显式供给模组(嵌入模式由入口程序集自供)
 			l.GameAssemblyResolver = n => n.Name == "SampleGame.Embedded" ? typeof(Main).Assembly : null;
 		});
 
@@ -47,11 +47,11 @@ public partial class Main : Node
 			if (loader.GetModMountPoint("com.lmloader.sample") is null ||
 				loader.GetModMountPoint("com.lmloader.sample.extra") is null)
 			{
-				SmokeFail("模组挂载点缺失(D5)");
+				SmokeFail("模组挂载点缺失");
 				return;
 			}
 
-			// 任务 2.4:模组 pck 挂载验证(D10)——pck 早于逻辑挂载,资源在此应可访问;
+			// 模组 pck 挂载验证——pck 早于逻辑挂载,资源在此应可访问;
 			// mod_icon.svg 经 Godot 导入(.import 重映射),验证导入产物在宿主挂载后的行为
 			var rawText = Godot.FileAccess.Open("res://mods/com.lmloader.sample/hello.txt", Godot.FileAccess.ModeFlags.Read);
 			if (rawText is null || rawText.GetAsText().Trim() != "hello-from-pck")
@@ -73,7 +73,7 @@ public partial class Main : Node
 				return;
 			}
 
-			// ---- M4:配置系统(D11) ----
+			// ---- 配置系统 ----
 			if (loader.Configs is null)
 			{
 				SmokeFail("配置系统未启用(user://configs)");
@@ -82,30 +82,30 @@ public partial class Main : Node
 
 			if (loader.LogBuffer is null || loader.LogBuffer.Snapshot().Length == 0)
 			{
-				SmokeFail("内存环形日志缓冲为空(D6)");
+				SmokeFail("内存环形日志缓冲为空");
 				return;
 			}
 
-			// 首次运行:缺失键应已按默认值写回 user://configs/(双模组各自一份,D11)
+			// 首次运行:缺失键应已按默认值写回 user://configs/(双模组各自一份)
 			if (!Godot.FileAccess.FileExists("user://configs/com.lmloader.sample.toml") ||
 				!Godot.FileAccess.FileExists("user://configs/com.lmloader.sample.extra.toml"))
 			{
-				SmokeFail("配置默认值未写回(D11)");
+				SmokeFail("配置默认值未写回");
 				return;
 			}
 
-			// 7.3 跨模组服务消费(D4 强类型直引):模组 B OnPostLoad 消费 base 的 IClockService
+			// 跨模组服务消费(强类型直引):模组 B OnPostLoad 消费 base 的 IClockService
 			var modB = AppDomain.CurrentDomain.GetAssemblies()
 				.FirstOrDefault(a => a.GetName().Name == "SampleModB");
 			var records = modB?.GetType("SampleB.SampleModuleB")
 				?.GetProperty("Records")?.GetValue(null) as System.Collections.Generic.List<string>;
 			if (records is null || records.Count == 0 || !records[0].StartsWith("clock:", StringComparison.Ordinal))
 			{
-				SmokeFail("跨模组服务消费未生效(D4)");
+				SmokeFail("跨模组服务消费未生效");
 				return;
 			}
 
-			// 任务 4.6:日志窗口——渲染环形缓冲 + 分级过滤(不入树,直接断言)
+			// 日志窗口——渲染环形缓冲 + 分级过滤(不入树,直接断言)
 			var window = new LMLoader.UI.LmLogWindow(loader.LogBuffer);
 			window.Refresh();
 			if (!window.LogText.Contains("[LMLoader]"))
@@ -123,7 +123,7 @@ public partial class Main : Node
 			}
 			window.QueueFree();
 
-			// 任务 4.4:热重载引擎链验证。设计:每轮运行只做一次外部写入(同真实用户编辑器
+			// 热重载引擎链验证。设计:每轮运行只做一次外部写入(同真实用户编辑器
 			// 场景),目标值在 100/250 间交替,使重复运行天然幂等;FSW 事件与 mtime 变化存在
 			// OS 级延迟(实测可到秒级),故用轮询等待生效,而非固定时延。
 			// 第一步:启动合并链——内存值应等于文件现值(boot 时已合并)。

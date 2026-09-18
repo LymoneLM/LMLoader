@@ -13,7 +13,7 @@ public enum ModuleLoadStatus
 	NotRun,
 }
 
-/// <summary>汇总表中的一行(模块 | 状态 | 原因,D7)。</summary>
+/// <summary>汇总表中的一行(模块 | 状态 | 原因)。</summary>
 public sealed class ModuleReportRow
 {
 	public required string ModuleUid { get; init; }
@@ -27,7 +27,7 @@ public sealed class ModuleReportRow
 }
 
 /// <summary>
-/// 人可读加载汇总(D7):单点失败不放大,一切可诊断;堆栈只进调试日志,不进汇总表。
+/// 人可读加载汇总:单点失败不放大,一切可诊断;堆栈只进调试日志,不进汇总表。
 /// </summary>
 public static class LoadReportFormatter
 {
@@ -162,7 +162,7 @@ public static class LoadReportFormatter
 			_ => "· 未执行",
 		};
 
-	/// <summary>异常摘要:类型 + 消息,截断到上限;完整堆栈仅进调试日志(D7)。</summary>
+	/// <summary>异常摘要:类型 + 消息,截断到上限;完整堆栈仅进调试日志。</summary>
 	private static string Summarize(Exception? exception)
 	{
 		if (exception is null)

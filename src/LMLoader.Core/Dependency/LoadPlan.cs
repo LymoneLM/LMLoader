@@ -18,7 +18,7 @@ public sealed class ModulePlanItem
 	public required ModuleEntry Module { get; init; }
 }
 
-/// <summary>未入列模块及原因(D7:一切可诊断)。</summary>
+/// <summary>未入列模块及原因。</summary>
 public sealed class SkippedModule
 {
 	public required string ModuleUid { get; init; }
@@ -30,11 +30,11 @@ public sealed class SkippedModule
 }
 
 /// <summary>
-/// 依赖规划产物。循环依赖为整批拒绝(草稿:静态扫描存在环则整批拒绝,输出完整依赖链)。
+/// 依赖规划产物。循环依赖为整批拒绝(静态扫描存在环则整批拒绝,输出完整依赖链)。
 /// </summary>
 public sealed class LoadPlan
 {
-	/// <summary>按加载顺序排列的模块(D8:并列时 UID 字典序)。</summary>
+	/// <summary>按加载顺序排列的模块(并列时 UID 字典序)。</summary>
 	public IReadOnlyList<ModulePlanItem> Ordered { get; init; } = Array.Empty<ModulePlanItem>();
 
 	/// <summary>未入列模块及原因(含级联跳过)。</summary>

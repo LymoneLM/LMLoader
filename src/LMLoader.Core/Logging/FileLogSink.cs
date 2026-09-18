@@ -4,7 +4,7 @@ namespace LMLoader.Core.Logging;
 
 /// <summary>
 /// 文件 sink(追加或截断模式);行格式同控制台但带完整日期。句柄以 ReadWrite 共享打开,
-/// 外部工具(日志窗口/tail)可实时读取。IO 失败(文件被占用等)丢弃该条不放大(D7),
+/// 外部工具(日志窗口/tail)可实时读取。IO 失败(文件被占用等)丢弃该条不放大,
 /// 后续事件自动重试重开。<see cref="Dispose"/> 供宿主退出前收尾。线程安全。
 /// </summary>
 public sealed class FileLogSink : ILogSink, IDisposable

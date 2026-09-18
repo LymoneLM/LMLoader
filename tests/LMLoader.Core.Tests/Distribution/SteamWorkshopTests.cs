@@ -4,7 +4,7 @@ using LMLoader.Distribution.SteamWorkshop;
 namespace LMLoader.Core.Tests.Distribution;
 
 /// <summary>
-/// 6.5 Workshop 订阅发现(D15):伪造 Steam 库布局验证 vdf 解析、ACF 孤儿过滤、
+/// Workshop 订阅发现:伪造 Steam 库布局验证 vdf 解析、ACF 孤儿过滤、
 /// mod.json 发现与 ModManager 附加根接入。
 /// </summary>
 [Trait("Category", "UsesFileSystem")]

@@ -14,7 +14,7 @@ namespace LMLoader.Core;
 
 /// <summary>
 /// 加载器门面:扫描 mods 目录 → 读取 mod.json → 过滤(gameId/loaderVersion) → 依赖规划 →
-/// 生命周期执行 → 人可读汇总(D7:模组级失败一律记录不抛出;loader 配置错误直接抛异常)。
+/// 生命周期执行 → 人可读汇总(模组级失败一律记录不抛出;loader 配置错误直接抛异常)。
 /// </summary>
 public sealed class ModManager : IDisposable
 {
@@ -22,13 +22,13 @@ public sealed class ModManager : IDisposable
 	private readonly ModAssemblyLoader _assemblyLoader;
 	private readonly Config.ConfigManager? _configManager;
 
-	/// <summary>日志中枢;宿主可自行增加 sink(文件/内存环形缓冲在阶段 4 提供)。</summary>
+	/// <summary>日志中枢;宿主可自行增加 sink。</summary>
 	public LoggerRouter LoggerRouter { get; }
 
-	/// <summary>跨模组服务注册表(D4)。</summary>
+	/// <summary>跨模组服务注册表。</summary>
 	public ServiceRegistry Services { get; }
 
-	/// <summary>配置协调器(D11);未配置 ConfigRootPath 时为 null(4.4 起热重载由此驱动)。</summary>
+	/// <summary>配置协调器;未配置 ConfigRootPath 时为 null(热重载由此驱动)。</summary>
 	public Config.ConfigManager? Configs => _configManager;
 
 	public ModManager(LoaderOptions options, LoggerRouter? loggerRouter = null, ServiceRegistry? serviceRegistry = null)
@@ -39,8 +39,8 @@ public sealed class ModManager : IDisposable
 		LoggerRouter = loggerRouter ?? new LoggerRouter { MinimumLevel = options.MinimumLogLevel };
 		Services = serviceRegistry ?? new ServiceRegistry();
 
-		// D1(修订):loader 供给 LMLoader.Api;HarmonyX 由模组自带(P3-20 实证:
-		// 进游戏依赖闭包会让导出构建的 MonoMod 被默认上下文二次解析,类型身份分裂)
+		// loader 供给 LMLoader.Api;HarmonyX 由模组自带——若进游戏依赖闭包,
+		// 导出构建的默认上下文会二次解析 MonoMod,类型身份分裂,patch 必失败
 		var shared = new List<Assembly> { typeof(LmModule).Assembly };
 		if (options.SharedLibraries is not null)
 		{
@@ -112,7 +112,7 @@ public sealed class ModManager : IDisposable
 				continue;
 			}
 
-			// ---- 2. 宿主过滤:gameId(D9:不匹配拒载) ----
+			// ---- 2. 宿主过滤:gameId(不匹配拒载) ----
 			if (!string.IsNullOrEmpty(_options.GameId) &&
 				!string.Equals(manifest.GameId, _options.GameId, StringComparison.Ordinal))
 			{
@@ -120,7 +120,7 @@ public sealed class ModManager : IDisposable
 				continue;
 			}
 
-			// ---- 3. loaderVersion 校验(阶段 5:区间语义;裸精确清单天然兼容) ----
+			// ---- 3. loaderVersion 校验(区间语义;裸精确清单天然兼容) ----
 			var apiVersion = _options.ApiVersion ?? typeof(LmModule).Assembly.GetName().Version!;
 			var apiSemVer = new SemVer(apiVersion.Major, apiVersion.Minor, Math.Max(apiVersion.Build, 0));
 			if (!manifest.LoaderVersion.Contains(apiSemVer))

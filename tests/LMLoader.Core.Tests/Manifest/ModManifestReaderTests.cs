@@ -224,12 +224,12 @@ public class ModManifestReaderTests
 	}
 
 	[Fact]
-	public void loaderVersion区间语法_报错并提示阶段5()
+	public void loaderVersion非法区间_报错并提示区间语法()
 	{
 		var result = Read(FullManifest.Replace("\"loaderVersion\": \"1.0.0\"", "\"loaderVersion\": \">=1.0.0 <2.0.0\""));
 
 		Assert.False(result.Success);
-		Assert.Contains(result.Errors, e => e.Contains("loaderVersion") && e.Contains("阶段 5"));
+		Assert.Contains(result.Errors, e => e.Contains("loaderVersion") && e.Contains("区间语法"));
 	}
 
 	[Fact]

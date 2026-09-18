@@ -6,7 +6,7 @@ namespace LMLoader.Api.Config;
 
 /// <summary>
 /// 配置标量类型转换(文件值 → 绑定类型)。Api 不依赖 Tomlyn:Core 把 TOML 原始值解包成
-/// 普通 CLR 标量(string/bool/数值)后交给这里。转换失败一律返回 false,由调用方按 D11 回退默认。
+/// 普通 CLR 标量(string/bool/数值)后交给这里。转换失败一律返回 false,由调用方回退默认。
 /// </summary>
 internal static class ConfigValueConverter
 {

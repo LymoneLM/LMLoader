@@ -2,7 +2,7 @@
 
 namespace LMLoader.Api.Config;
 
-/// <summary>文件值写入结果:Applied = 已生效;TypeMismatch = 类型/值域不符,由调用方回退默认并警告(D11)。</summary>
+/// <summary>文件值写入结果:Applied = 已生效;TypeMismatch = 类型/值域不符,由调用方回退默认并警告。</summary>
 internal enum ConfigSetOutcome
 {
 	Applied,
@@ -11,7 +11,7 @@ internal enum ConfigSetOutcome
 }
 
 /// <summary>
-/// 配置项元数据基类:节、键、描述、是否需重启、约束与默认值(为 GUI 配置面板预留,任务 4.2)。
+/// 配置项元数据基类:节、键、描述、是否需重启、约束与默认值(为 GUI 配置面板预留)。
 /// 类型化读写见 <see cref="ConfigEntry{T}"/>,实例由 <see cref="ModConfig.Bind{T}"/> 创建,不开放外部构造。
 /// </summary>
 public abstract class ConfigEntryBase

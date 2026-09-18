@@ -3,7 +3,7 @@
 namespace LMLoader.Api.Config;
 
 /// <summary>
-/// 配置项取值约束基类(D11 元数据,为 GUI 配置面板预留):范围或枚举列表。
+/// 配置项取值约束基类(为 GUI 配置面板预留):范围或枚举列表。
 /// 文件读入路径上,范围越界做钳制、列表外值回退默认;代码直接赋值 <see cref="ConfigEntry{T}.Value"/>
 /// 时范围同样钳制,列表外值视为编程错误直接抛出。
 /// </summary>
@@ -16,7 +16,7 @@ public abstract class AcceptableValueBase
 	public abstract string Describe();
 
 	/// <summary>
-	/// 把装箱值收敛进合法域:范围约束钳制到边界,列表约束对非法值返回 null(调用方按 D11 回退默认)。
+	/// 把装箱值收敛进合法域:范围约束钳制到边界,列表约束对非法值返回 null(调用方回退默认)。
 	/// 值类型与 <see cref="ValueType"/> 不符返回 null。
 	/// </summary>
 	internal abstract object? CoerceBoxed(object value);

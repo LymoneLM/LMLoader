@@ -3,7 +3,7 @@
 namespace LMLoader.Core.Manifest;
 
 /// <summary>
-/// 清单读取结果(D7 宽松语义:错误累积返回而非抛出,由调用方决定跳过模组并记录原因)。
+/// 清单读取结果(宽松语义:错误累积返回而非抛出,由调用方决定跳过模组并记录原因)。
 /// </summary>
 public sealed class ManifestReadResult
 {

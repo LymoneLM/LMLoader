@@ -9,7 +9,7 @@ using Tomlyn.Model;
 namespace LMLoader.Core.Config;
 
 /// <summary>
-/// 模组配置协调器(D11):按 modUid 汇集声明面(同模组多模块共享一份),
+/// 模组配置协调器:按 modUid 汇集声明面(同模组多模块共享一份),
 /// PreLoad 后读入 <c>&lt;root&gt;/&lt;modUid&gt;.toml</c> 合并——缺失键补默认并写回、孤儿键保留、
 /// 类型/取值不符回退默认并警告;配置文件解析失败时整模组跳过(用默认值且不写回,保护用户原稿)。
 /// </summary>
@@ -34,7 +34,7 @@ public sealed class ConfigManager : IDisposable
 	}
 
 	/// <summary>
-	/// 开启文件热重载(D11:FileSystemWatcher + 防抖);幂等。回调在监视线程执行。
+	/// 开启文件热重载(FileSystemWatcher + 防抖);幂等。回调在监视线程执行。
 	/// 配置目录不存在时自动创建。
 	/// </summary>
 	public void StartHotReload(TimeSpan? debounce = null)
@@ -61,7 +61,7 @@ public sealed class ConfigManager : IDisposable
 		_configsByMod.TryGetValue(modUid, out config);
 
 	/// <summary>
-	/// Runner 在模块实例化时注册(D11 文件以 modUid 命名)。同一次运行内同模组多模块
+	/// Runner 在模块实例化时注册(文件以 modUid 命名)。同一次运行内同模组多模块
 	/// 由 Runner 去重共享;重复 LoadAll 时以最近一次运行的实例为准(否则热重载会打到
 	/// 上次运行的旧实例上,新模块收不到重载)。
 	/// </summary>
@@ -70,7 +70,7 @@ public sealed class ConfigManager : IDisposable
 		_configsByMod[modUid] = config;
 	}
 
-	/// <summary>首次合并(D11):PreLoad 之后、OnLoad 之前逐模组调用;写回文件。</summary>
+	/// <summary>首次合并:PreLoad 之后、OnLoad 之前逐模组调用;写回文件。</summary>
 	internal void ApplyAfterPreLoad(IReadOnlyCollection<KeyValuePair<string, ModConfig>> modules)
 	{
 		lock (_mergeGate)
@@ -178,7 +178,7 @@ public sealed class ConfigManager : IDisposable
 		}
 		catch (Exception ex)
 		{
-			// 写回失败不放大(D7):值已在内存生效,文件下次合并时再落盘
+			// 写回失败不放大:值已在内存生效,文件下次合并时再落盘
 			_logger.Warn($"模组 \"{modUid}\" 配置写回失败: {ex.Message}");
 		}
 	}

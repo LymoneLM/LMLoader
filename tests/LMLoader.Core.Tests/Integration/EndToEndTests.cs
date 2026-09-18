@@ -4,8 +4,8 @@ using LMLoader.Core.Tests.TestInfrastructure;
 namespace LMLoader.Core.Tests.Integration;
 
 /// <summary>
-/// M1 里程碑端到端验证:真实 mod.json 文件 → ModManager 全流程
-/// (扫描 → 排序 → 加载 → 钩子 → 汇总),覆盖 D4 双通道与确定性排序。
+/// 端到端验证:真实 mod.json 文件 → ModManager 全流程
+/// (扫描 → 排序 → 加载 → 钩子 → 汇总),覆盖双通道服务与确定性排序。
 /// </summary>
 public class EndToEndTests : IDisposable
 {
@@ -125,11 +125,11 @@ public class EndToEndTests : IDisposable
 
 	[Trait("Category", "UsesFileSystem")]
 	[Fact]
-	public void M1_端到端_依赖链排序与跨模组服务消费()
+	public void 端到端_依赖链排序与跨模组服务消费()
 	{
 		var apiDll = CreateE2EApiDll();
 
-		// base:发布 IGreeter 服务(D4 弱类型通道)
+		// base:发布 IGreeter 服务(弱类型通道)
 		CreateMod(
 			"com.e.base",
 			"""
@@ -183,7 +183,7 @@ public class EndToEndTests : IDisposable
 
 	[Trait("Category", "UsesFileSystem")]
 	[Fact]
-	public void M1_端到端_强类型直引通道跨模组静态调用()
+	public void 端到端_强类型直引通道跨模组静态调用()
 	{
 		var apiDll = CreateE2EApiDll();
 
@@ -215,7 +215,7 @@ public class EndToEndTests : IDisposable
 			.Replace("#CLASS#", "M_com_e_direct")
 			.Replace("#DEPS#", "[]"));
 
-		// consumer:编译期直引 base 模组 dll(D4 强类型通道;运行期经共享 ALC 解析)
+		// consumer:编译期直引 base 模组 dll(强类型通道;运行期经共享 ALC 解析)
 		var consumerDir = Path.Combine(ModsRoot, "com.e.reader");
 		Directory.CreateDirectory(consumerDir);
 		var consumerRecorderDll = TestCompiler.CompileToDirectory(consumerDir, "CallRecorderLib", RecorderSource);
@@ -257,7 +257,7 @@ public class EndToEndTests : IDisposable
 
 	[Trait("Category", "UsesFileSystem")]
 	[Fact]
-	public void M1_端到端_两次独立运行加载顺序一致_D8确定性()
+	public void 端到端_两次独立运行加载顺序一致_确定性排序()
 	{
 		CreateMod("com.e.alpha", "", loadBody: @"Record(""alpha:load"");");
 		CreateMod("com.e.beta", "", loadBody: @"Record(""beta:load"");", depends: [("com.e.alpha", false)]);

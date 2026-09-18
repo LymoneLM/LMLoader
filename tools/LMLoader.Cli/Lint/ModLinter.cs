@@ -14,9 +14,9 @@ public sealed record LintIssue(bool IsError, string Message);
 public sealed record LintResult(bool Success, IReadOnlyList<LintIssue> Issues);
 
 /// <summary>
-/// mod.json 作者侧严格校验(6.4)。与运行时 reader 的宽容语义互补:
+/// mod.json 作者侧严格校验。与运行时 reader 的宽容语义互补:
 /// 运行时"忽略并继续"的行为在此一律升级为 error(作者必须在发布前修正),
-/// 另加磁盘一致性检查(入口程序集/图标/pck 文件存在)与 Thunderstore 别名预校验(D16)。
+/// 另加磁盘一致性检查(入口程序集/图标/pck 文件存在)与 Thunderstore 别名预校验。
 /// </summary>
 public static partial class ModLinter
 {
@@ -106,7 +106,7 @@ public static partial class ModLinter
 			}
 		}
 
-		// ---- 5. Thunderstore 别名预校验(D16;打包前早失败) ----
+		// ---- 5. Thunderstore 别名预校验(打包前早失败) ----
 		if (manifest.Distribution is { } distribution)
 		{
 			if (distribution.ThunderstoreTeam is { } team && !TeamName().IsMatch(team))
