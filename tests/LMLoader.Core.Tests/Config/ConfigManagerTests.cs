@@ -42,7 +42,7 @@ public class ConfigManagerTests : IDisposable
 	}
 
 	[Fact]
-	public void Register_每模组首次实例生效()
+	public void Register_重复注册以最近实例为准_热重载接线跟随最新运行()
 	{
 		var manager = new ConfigManager(_root);
 		var first = new ModConfig();
@@ -52,7 +52,21 @@ public class ConfigManagerTests : IDisposable
 		manager.Register("com.a.b", second);
 
 		manager.TryGetConfig("com.a.b", out var got);
-		Assert.Same(first, got);
+		Assert.Same(second, got);
+	}
+
+	[Fact]
+	public void 合并完成后冻结_再Bind抛错()
+	{
+		var manager = new ConfigManager(_root);
+		var config = new ModConfig();
+		var entry = config.Bind("s", "k", 1);
+		manager.Register("com.a.b", config);
+
+		Apply(manager, "com.a.b", config);
+
+		Assert.Throws<InvalidOperationException>(() => config.Bind("s", "late", 2));
+		Assert.Equal(1, entry.Value);
 	}
 
 	[Fact]

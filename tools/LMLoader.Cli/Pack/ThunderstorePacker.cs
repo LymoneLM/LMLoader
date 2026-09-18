@@ -42,19 +42,22 @@ public static class ThunderstorePacker
 		var tsManifest = ThunderstoreAdapter.ToThunderstore(
 			manifest, team, dependencyManifests ?? new Dictionary<string, ModManifest>(), warn);
 
-		// icon.png:平台必须;显式 icon 指向其他 png 时复制改名
-		var iconTarget = Path.Combine(dir, "icon.png");
-		if (!File.Exists(iconTarget))
+		// icon.png:平台必须。目录根已有 icon.png 直接用;否则取显式 icon(须 png)在 zip 内改名——
+		// 不修改作者源目录(打包不应有副作用)
+		string? iconSource = null;
+		if (File.Exists(Path.Combine(dir, "icon.png")))
 		{
-			if (manifest.Icon is { } icon && icon.EndsWith(".png", StringComparison.OrdinalIgnoreCase))
-			{
-				File.Copy(Path.Combine(dir, icon), iconTarget, overwrite: true);
-				warn?.Invoke($"已将 {icon} 复制为 icon.png(平台要求根目录 icon.png)");
-			}
-			else
-			{
-				throw new FileNotFoundException("根目录缺 icon.png(Thunderstore 上传必需;icon 字段须指向 png)");
-			}
+			iconSource = null; // 随目录全量枚举自然进入
+		}
+		else if (manifest.Icon is { } icon && icon.EndsWith(".png", StringComparison.OrdinalIgnoreCase)
+			&& File.Exists(Path.Combine(dir, icon)))
+		{
+			iconSource = Path.Combine(dir, icon);
+			warn?.Invoke($"zip 内将 {icon} 改名为 icon.png(平台要求根目录 icon.png)");
+		}
+		else
+		{
+			throw new FileNotFoundException("根目录缺 icon.png(Thunderstore 上传必需;icon 字段须指向 png)");
 		}
 
 		var fullZip = Path.GetFullPath(zipPath);
@@ -71,6 +74,12 @@ public static class ThunderstorePacker
 		// 1. 生成的 manifest.json 在根
 		AddEntry(archive, "manifest.json", tsManifest.Serialize());
 		added.Add("manifest.json");
+
+		if (iconSource is not null)
+		{
+			archive.CreateEntryFromFile(iconSource, "icon.png", CompressionLevel.Optimal);
+			added.Add("icon.png");
+		}
 
 		// 2. 模组目录全量(相对路径进 zip 根;排除目录内既有的 manifest.json 与输出 zip 自身防冲突/自吞)
 		foreach (var file in Directory.EnumerateFiles(dir, "*", SearchOption.AllDirectories))

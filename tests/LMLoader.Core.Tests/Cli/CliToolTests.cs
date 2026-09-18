@@ -219,36 +219,45 @@ public class PckExporterTests : IDisposable
 	{
 		var runner = new RecordingRunner();
 		var exporter = new PckExporter(runner);
-		var project = Path.Combine(_root, "project.godot");
-		File.WriteAllText(project, "");
+		var projectDir = Path.Combine(_root, "project");
+		Directory.CreateDirectory(projectDir);
+		File.WriteAllText(Path.Combine(projectDir, "project.godot"), "");
 		var output = Path.Combine(_root, "deep", "dir", "pack.pck");
 
-		var result = exporter.Export("godot.exe", project, "PCK", output);
+		var result = exporter.Export("godot.exe", projectDir, "PCK", output);
 
 		Assert.True(result.Success);
 		Assert.Equal("godot.exe", runner.FileName);
-		Assert.Contains($"--path \"{project}\"", runner.Arguments);
+		Assert.Contains($"--path \"{projectDir}\"", runner.Arguments);
 		Assert.Contains($"--export-pack \"PCK\" \"{output}\"", runner.Arguments);
 		Assert.True(Directory.Exists(Path.Combine(_root, "deep", "dir")));
 	}
 
 	[Fact]
-	public void 工程文件缺失_报错()
+	public void 工程目录缺失或无project文件_报错()
 	{
 		var exporter = new PckExporter(new RecordingRunner());
 
-		Assert.Throws<FileNotFoundException>(
-			() => exporter.Export("godot.exe", Path.Combine(_root, "missing.godot"), "PCK", "out.pck"));
+		// 目录不存在
+		Assert.Throws<DirectoryNotFoundException>(
+			() => exporter.Export("godot.exe", Path.Combine(_root, "missing"), "PCK", "out.pck"));
+
+		// 目录存在但无 project.godot(如误传了工程文件路径或空目录)
+		var empty = Path.Combine(_root, "empty");
+		Directory.CreateDirectory(empty);
+		Assert.Throws<DirectoryNotFoundException>(
+			() => exporter.Export("godot.exe", empty, "PCK", "out.pck"));
 	}
 
 	[Fact]
 	public void 非零退出码_透传失败()
 	{
 		var runner = new RecordingRunner { NextExitCode = 1 };
-		var project = Path.Combine(_root, "project.godot");
-		File.WriteAllText(project, "");
+		var projectDir = Path.Combine(_root, "project");
+		Directory.CreateDirectory(projectDir);
+		File.WriteAllText(Path.Combine(projectDir, "project.godot"), "");
 
-		Assert.False(new PckExporter(runner).Export("godot.exe", project, "PCK", "out.pck").Success);
+		Assert.False(new PckExporter(runner).Export("godot.exe", projectDir, "PCK", "out.pck").Success);
 	}
 }
 
@@ -323,6 +332,23 @@ public class ThunderstorePackerTests : IDisposable
 
 		Assert.Throws<FileNotFoundException>(
 			() => ThunderstorePacker.Pack(_dir, "Author", Path.Combine(_dir, "out.zip")));
+	}
+
+	[Fact]
+	public void icon改名进zip_不修改源目录()
+	{
+		// 无 icon.png,但 icon 字段指向 logo.png:zip 内改名,源目录保持原样
+		File.WriteAllText(Path.Combine(_dir, "com.author.modname.mod.json"), Manifest.Replace(
+			"\"description\": \"demo 模组\",", "\"description\": \"demo 模组\", \"icon\": \"logo.png\","));
+		File.WriteAllText(Path.Combine(_dir, "Mod.dll"), "fake");
+		File.WriteAllText(Path.Combine(_dir, "logo.png"), "fake-png");
+		var zip = Path.Combine(_dir, "out.zip");
+
+		ThunderstorePacker.Pack(_dir, "Author", zip);
+
+		Assert.False(File.Exists(Path.Combine(_dir, "icon.png"))); // 源目录未被污染
+		using var archive = ZipFile.OpenRead(zip);
+		Assert.NotNull(archive.GetEntry("icon.png"));
 	}
 
 	[Fact]

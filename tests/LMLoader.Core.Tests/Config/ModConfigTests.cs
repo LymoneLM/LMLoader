@@ -246,6 +246,18 @@ public class ModConfigTests
 	}
 
 	[Fact]
+	public void 文件值写入_未定义enum字符串与数字均Mismatch()
+	{
+		var config = new ModConfig();
+		var entry = config.Bind("s", "k", Mode.Off);
+
+		// 回归:数字字符串曾经 Enum.TryParse 穿透未定义检查
+		Assert.Equal(ConfigSetOutcome.TypeMismatch, entry.TrySetFromRaw("99"));
+		Assert.Equal(ConfigSetOutcome.TypeMismatch, entry.TrySetFromRaw("NoSuchMode"));
+		Assert.Equal(Mode.Off, entry.Value);
+	}
+
+	[Fact]
 	public void 文件值写入_跨类型标量转换()
 	{
 		var config = new ModConfig();

@@ -12,6 +12,9 @@ public sealed class ModConfig
 	private readonly Dictionary<(string Section, string Key), ConfigEntryBase> _byIdentity = new();
 	private readonly List<ConfigEntryBase> _ordered = new();
 
+	/// <summary>true = 已完成磁盘合并(PreLoad 后);此后 Bind 将抛错(声明过晚,合并不到)。</summary>
+	private bool _merged;
+
 	/// <summary>按声明顺序排列的全部配置项。</summary>
 	public IReadOnlyList<ConfigEntryBase> Entries => _ordered;
 
@@ -24,6 +27,12 @@ public sealed class ModConfig
 		AcceptableValueBase? acceptableValues = null)
 		where T : notnull
 	{
+		if (_merged)
+		{
+			throw new InvalidOperationException(
+				"配置合并已完成(PreLoad 阶段结束),此声明不会写回文件也不会读入用户值;" +
+				"请在 OnPreLoad 中调用 Bind(D11)");
+		}
 		if (section is null)
 		{
 			throw new ArgumentNullException(nameof(section));
@@ -61,4 +70,7 @@ public sealed class ModConfig
 	/// <summary>Core 合并路径:按节/键定位已声明项。</summary>
 	internal bool TryGetEntry(string section, string key, out ConfigEntryBase? entry) =>
 		_byIdentity.TryGetValue((section, key), out entry);
+
+	/// <summary>Core 在磁盘合并完成后调用;冻结后 Bind 抛错(声明必须发生在 OnPreLoad)。</summary>
+	internal void Freeze() => _merged = true;
 }

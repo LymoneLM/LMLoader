@@ -27,7 +27,9 @@ internal static class ConfigValueConverter
 		{
 			if (targetType.IsEnum)
 			{
-				if (raw is string name && Enum.TryParse(targetType, name, ignoreCase: true, out var parsed))
+				// 注意:Enum.TryParse 对数字字符串("99")即使未定义也返回 true,必须补 IsDefined
+				if (raw is string name && Enum.TryParse(targetType, name, ignoreCase: true, out var parsed)
+					&& Enum.IsDefined(targetType, parsed))
 				{
 					converted = parsed;
 					return true;

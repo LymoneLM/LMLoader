@@ -19,6 +19,10 @@ public sealed class ConfigManager : IDisposable
 	private readonly TomlConfigStore _store;
 	private readonly ILmLogger _logger;
 	private readonly Dictionary<string, ModConfig> _configsByMod = new(StringComparer.Ordinal);
+
+	/// <summary>合并(boot)与热重载(后台线程)串行化闸门:FWS 防抖与 mtime 兜底可能并发触发。</summary>
+	private readonly object _mergeGate = new();
+
 	private ConfigWatcher? _watcher;
 
 	public ConfigManager(string rootPath, TomlConfigStore? store = null, ILmLogger? logger = null)
@@ -56,34 +60,40 @@ public sealed class ConfigManager : IDisposable
 	public bool TryGetConfig(string modUid, out ModConfig? config) =>
 		_configsByMod.TryGetValue(modUid, out config);
 
-	/// <summary>Runner 在模块实例化时注册(每模组首次注册生效;D11 文件以 modUid 命名)。</summary>
+	/// <summary>
+	/// Runner 在模块实例化时注册(D11 文件以 modUid 命名)。同一次运行内同模组多模块
+	/// 由 Runner 去重共享;重复 LoadAll 时以最近一次运行的实例为准(否则热重载会打到
+	/// 上次运行的旧实例上,新模块收不到重载)。
+	/// </summary>
 	internal void Register(string modUid, ModConfig config)
 	{
-		if (_configsByMod.TryAdd(modUid, config))
-		{
-			return;
-		}
-
-		// 同模组后续模块共享已注册实例,保证单文件单一事实来源
-		var shared = _configsByMod[modUid];
-		if (!ReferenceEquals(shared, config))
-		{
-			// Runner 侧按模组去重,正常不会走到;防御性提示
-			_logger.Warn($"模组 \"{modUid}\" 出现多份配置实例,以首次注册为准");
-		}
+		_configsByMod[modUid] = config;
 	}
 
 	/// <summary>首次合并(D11):PreLoad 之后、OnLoad 之前逐模组调用;写回文件。</summary>
 	internal void ApplyAfterPreLoad(IReadOnlyCollection<KeyValuePair<string, ModConfig>> modules)
 	{
-		foreach (var pair in modules)
+		lock (_mergeGate)
 		{
-			MergeAndWrite(pair.Key, pair.Value);
+			foreach (var pair in modules)
+			{
+				MergeAndWrite(pair.Key, pair.Value);
+				pair.Value.Freeze(); // 合并后冻结:Bind 必须发生在 OnPreLoad,过晚声明不可能合并
+			}
 		}
 	}
 
-	/// <summary>热重载核心(4.4 由防抖监听驱动):文件中存在的键才更新;键被删除保持当前值;不写回。</summary>
+	/// <summary>热重载核心(4.4 由防抖监听驱动):文件中存在的键才更新;键被删除保持当前值;不写回。
+	/// FSW 防抖与 mtime 兜底可能并发触发,经 _mergeGate 串行化。</summary>
 	internal void ReloadFromFile(string modUid, ModConfig config)
+	{
+		lock (_mergeGate)
+		{
+			ReloadFromFileCore(modUid, config);
+		}
+	}
+
+	private void ReloadFromFileCore(string modUid, ModConfig config)
 	{
 		var path = TomlConfigStore.GetConfigFilePath(_rootPath, modUid);
 		TomlTable disk;

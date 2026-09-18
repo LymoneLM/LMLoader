@@ -54,9 +54,11 @@ public sealed class PckExporter(IProcessRunner? runner = null)
 	public ProcessResult Export(string godotExecutable, string projectPath, string preset, string outputPath)
 	{
 		ArgumentException.ThrowIfNullOrWhiteSpace(godotExecutable);
-		if (!File.Exists(projectPath))
+		// godot --path 接受含 project.godot 的目录(而非工程文件本身)
+		if (!Directory.Exists(projectPath) || !File.Exists(Path.Combine(projectPath, "project.godot")))
 		{
-			throw new FileNotFoundException($"Godot 工程文件不存在: {projectPath}", projectPath);
+			throw new DirectoryNotFoundException(
+				$"Godot 工程目录无效(须为含 project.godot 的目录): {projectPath}");
 		}
 
 		var fullOutput = Path.GetFullPath(outputPath);
