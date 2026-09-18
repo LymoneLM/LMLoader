@@ -169,6 +169,29 @@ public class ModManagerTests : IDisposable
 
 	[Trait("Category", "UsesFileSystem")]
 	[Fact]
+	public void loaderVersion区间声明_命中通过_未命中拒载()
+	{
+		// ^1.0.0 应命中当前 API 1.0.0 基线
+		CreateMod("com.t.ranged", "", loaderVersion: "^1.0.0");
+
+		using var manager = CreateManager();
+		var result = manager.LoadAll();
+
+		var single = Assert.Single(result.LoadedManifests);
+		Assert.Equal("com.t.ranged", single.Uid);
+
+		// 未命中:区间原文进汇总(目录里仍有命中区间的 com.t.ranged,它存活)
+		CreateMod("com.t.ranged2", "", loaderVersion: "^2.0.0");
+		var result2 = manager.LoadAll();
+
+		var survivor = Assert.Single(result2.LoadedManifests);
+		Assert.Equal("com.t.ranged", survivor.Uid);
+		Assert.Contains("loaderVersion 不满足", result2.SummaryText);
+		Assert.Contains("^2.0.0", result2.SummaryText);
+	}
+
+	[Trait("Category", "UsesFileSystem")]
+	[Fact]
 	public void 未知字段警告汇聚到读取警告()
 	{
 		CreateMod("com.t.future", "", extraJson: ", \"futureField\": 1");
