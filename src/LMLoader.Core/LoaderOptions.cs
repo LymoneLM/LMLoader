@@ -12,6 +12,12 @@ public sealed class LoaderOptions
 	public required string ModsRootPath { get; init; }
 
 	/// <summary>
+	/// 附加扫描根(阶段 6.5):Steam Workshop 订阅目录等;与主根同样递归扫描 *mod.json,
+	/// 同模组多根重复时以主根为准(附加根副本告警)。目录不存在时静默跳过(可选来源)。
+	/// </summary>
+	public IEnumerable<string>? AdditionalModsRoots { get; init; }
+
+	/// <summary>
 	/// 宿主游戏标识;非空时与模组 <c>gameId</c> 比对,不匹配拒载(D9)。
 	/// </summary>
 	public string GameId { get; init; } = "";

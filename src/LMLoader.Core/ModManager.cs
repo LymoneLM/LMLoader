@@ -72,11 +72,25 @@ public sealed class ModManager : IDisposable
 		var readWarnings = new List<string>();
 		var manifests = new List<ModManifest>();
 
-		// ---- 1. 扫描与读取 ----
+		// ---- 1. 扫描与读取(主根 + 附加根:Workshop 订阅目录等,6.5) ----
 		var scan = ScanManifestPaths(_options.ModsRootPath);
 		readWarnings.AddRange(scan.Warnings);
+		var paths = new List<string>(scan.Paths);
 
-		foreach (var manifestPath in scan.Paths)
+		foreach (var additionalRoot in _options.AdditionalModsRoots ?? [])
+		{
+			if (!Directory.Exists(additionalRoot))
+			{
+				continue; // 可选来源:缺失即跳过(Workshop 未装/路径失效属正常)
+			}
+
+			var additional = ScanManifestPaths(additionalRoot);
+			readWarnings.AddRange(additional.Warnings);
+			paths.AddRange(additional.Paths.Except(paths, StringComparer.OrdinalIgnoreCase));
+		}
+
+		var seenUids = new HashSet<string>(StringComparer.Ordinal);
+		foreach (var manifestPath in paths)
 		{
 			var result = ModManifestReader.ReadFile(manifestPath);
 			readWarnings.AddRange(result.Warnings.Select(w => $"{manifestPath}: {w}"));
@@ -89,6 +103,14 @@ public sealed class ModManager : IDisposable
 			}
 
 			var manifest = result.Manifest!;
+
+			// 附加根可能扫到主根已有模组的副本:主根优先,副本告警跳过
+			if (!seenUids.Add(manifest.Uid))
+			{
+				manifestFailures.Add((manifestPath,
+					$"模组 \"{manifest.Uid}\" 已从其他扫描根加载,本副本忽略(主根优先于附加根)"));
+				continue;
+			}
 
 			// ---- 2. 宿主过滤:gameId(D9:不匹配拒载) ----
 			if (!string.IsNullOrEmpty(_options.GameId) &&

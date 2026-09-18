@@ -22,6 +22,7 @@
   <ItemGroup>
     <ProjectReference Include="..\..\src\LMLoader.Core\LMLoader.Core.csproj" />
     <ProjectReference Include="..\..\src\LMLoader.Distribution.Thunderstore\LMLoader.Distribution.Thunderstore.csproj" />
+    <ProjectReference Include="..\..\src\LMLoader.Distribution.SteamWorkshop\LMLoader.Distribution.SteamWorkshop.csproj" />
     <ProjectReference Include="..\..\tools\LMLoader.Cli\LMLoader.Cli.csproj" />
   </ItemGroup>
 
