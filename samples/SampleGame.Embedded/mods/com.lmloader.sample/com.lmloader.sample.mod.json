@@ -5,6 +5,7 @@
   "version": "1.0.0",
   "authors": ["LymoneLM"],
   "description": "LMLoader 样例模组:演示清单、服务发布与日志",
+  "tags": ["sample", "demo"],
   "gameId": "com.lmloader.samplegame",
   "loaderVersion": "1.0.0",
   "entry": {

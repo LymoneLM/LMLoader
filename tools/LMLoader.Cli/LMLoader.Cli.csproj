@@ -1,0 +1,15 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- 公共属性见根目录 Directory.Build.props(TFM 继承 net8.0)。
+       mod 作者侧工具:mod.json lint 校验 + pck 导出包装 + Thunderstore 打包(6.4)。 -->
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <RollForward>LatestMajor</RollForward>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\LMLoader.Core\LMLoader.Core.csproj" />
+    <ProjectReference Include="..\..\src\LMLoader.Distribution.Thunderstore\LMLoader.Distribution.Thunderstore.csproj" />
+  </ItemGroup>
+
+</Project>
