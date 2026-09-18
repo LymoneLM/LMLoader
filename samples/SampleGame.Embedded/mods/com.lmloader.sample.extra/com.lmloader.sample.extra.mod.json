@@ -1,0 +1,18 @@
+{
+  "schemaVersion": 1,
+  "uid": "com.lmloader.sample.extra",
+  "name": "样例模组 B(依赖协作)",
+  "version": "1.0.0",
+  "authors": ["LymoneLM"],
+  "description": "演示依赖链、跨模组服务消费与独立配置",
+  "tags": ["sample", "demo"],
+  "gameId": "com.lmloader.samplegame",
+  "loaderVersion": "1.0.0",
+  "entry": {
+    "assembly": "SampleModB.dll",
+    "modules": [
+      { "uid": "com.lmloader.sample.extra.main", "type": "SampleB.SampleModuleB",
+        "depends": [ { "uid": "com.lmloader.sample.main", "version": "^1.0.0" } ] }
+    ]
+  }
+}

@@ -103,6 +103,19 @@ public class ModLinterTests : IDisposable
 	}
 
 	[Fact]
+	public void 嵌套依赖的合法字段不误报()
+	{
+		// 回归:depends[] 嵌在 modules[] 内,字段表曾被错用模块集(uid/type/depends)
+		WriteMod(GoodManifest.Replace(
+			"\"type\": \"A.B.M\" } ]",
+			"\"type\": \"A.B.M\", \"depends\": [ { \"uid\": \"com.other.core\", \"version\": \"^1.0.0\", \"soft\": false } ] } ]"));
+
+		var result = ModLinter.Lint(_dir);
+
+		Assert.DoesNotContain(result.Issues, i => i.Message.Contains("depends"));
+	}
+
+	[Fact]
 	public void 入口程序集缺失_报错()
 	{
 		Directory.CreateDirectory(_dir);

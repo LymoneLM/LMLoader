@@ -144,11 +144,13 @@ public static partial class ModLinter
 			return;
 		}
 
-		var known = StrictFields.GetValueOrDefault(path, path.Contains(".modules[", StringComparison.Ordinal)
-			? ["uid", "type", "depends"]
-			: path.Contains(".depends[", StringComparison.Ordinal)
+		var known = StrictFields.GetValueOrDefault(path,
+			// 依赖数组嵌在 modules[] 内:先判 depends[] 再判 modules[](路径同时包含两者)
+			path.Contains(".depends[", StringComparison.Ordinal)
 				? ["uid", "version", "soft"]
-				: Array.Empty<string>());
+				: path.Contains(".modules[", StringComparison.Ordinal)
+					? ["uid", "type", "depends"]
+					: Array.Empty<string>());
 
 		foreach (var property in element.EnumerateObject())
 		{

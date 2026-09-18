@@ -37,13 +37,15 @@ public partial class Main : Node
 		loader.BootCompleted += () =>
 		{
 			var result = loader.LastLoadResult;
-			if (result is null || result.Lifecycle is null || result.Lifecycle.SucceededCount != 1)
+			// 7.3 双模组协作:base(patch/服务发布/pck)+ extra(硬依赖/服务消费/独立配置)
+			if (result is null || result.Lifecycle is null || result.Lifecycle.SucceededCount != 2)
 			{
 				SmokeFail(result?.SummaryText ?? "(无加载结果)");
 				return;
 			}
 
-			if (loader.GetModMountPoint("com.lmloader.sample") is null)
+			if (loader.GetModMountPoint("com.lmloader.sample") is null ||
+				loader.GetModMountPoint("com.lmloader.sample.extra") is null)
 			{
 				SmokeFail("模组挂载点缺失(D5)");
 				return;
@@ -84,10 +86,22 @@ public partial class Main : Node
 				return;
 			}
 
-			// 首次运行:缺失键应已按默认值写回 user://configs/com.lmloader.sample.toml
-			if (!Godot.FileAccess.FileExists("user://configs/com.lmloader.sample.toml"))
+			// 首次运行:缺失键应已按默认值写回 user://configs/(双模组各自一份,D11)
+			if (!Godot.FileAccess.FileExists("user://configs/com.lmloader.sample.toml") ||
+				!Godot.FileAccess.FileExists("user://configs/com.lmloader.sample.extra.toml"))
 			{
 				SmokeFail("配置默认值未写回(D11)");
+				return;
+			}
+
+			// 7.3 跨模组服务消费(D4 强类型直引):模组 B OnPostLoad 消费 base 的 IClockService
+			var modB = AppDomain.CurrentDomain.GetAssemblies()
+				.FirstOrDefault(a => a.GetName().Name == "SampleModB");
+			var records = modB?.GetType("SampleB.SampleModuleB")
+				?.GetProperty("Records")?.GetValue(null) as System.Collections.Generic.List<string>;
+			if (records is null || records.Count == 0 || !records[0].StartsWith("clock:", StringComparison.Ordinal))
+			{
+				SmokeFail("跨模组服务消费未生效(D4)");
 				return;
 			}
 

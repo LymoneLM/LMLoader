@@ -1,0 +1,34 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- 样例模组 B:演示依赖链(D8)、跨模组服务消费(D4 强类型直引通道)与独立配置文件(D11)。
+       构建产物落到样例游戏的第二个 mods 子目录;SampleMod 以编译期引用(不随包分发,运行期由其所在目录解析)。 -->
+  <PropertyGroup>
+    <OutputPath>..\..\SampleGame.Embedded\mods\com.lmloader.sample.extra\</OutputPath>
+    <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
+    <CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- loader 只供给一份 Api(D1):Private=false 不随模组分发 -->
+    <ProjectReference Include="..\..\..\src\LMLoader.Api\LMLoader.Api.csproj">
+      <Private>false</Private>
+    </ProjectReference>
+    <!-- 强类型通道:直接引用 base 模组的 IClockService(运行期由 base 模组目录副本解析,Private=false 不复制) -->
+    <ProjectReference Include="..\SampleMod\SampleMod.csproj">
+      <Private>false</Private>
+      <ReferenceOutputAssembly>true</ReferenceOutputAssembly>
+    </ProjectReference>
+  </ItemGroup>
+
+  <!-- 传递依赖(Harmony 链/GodotSharp/游戏程序集)会被拷进输出目录;模组只应带本体 dll。
+       依赖在运行期由 loader 供给(Api)/base 模组目录解析(SampleMod),删除冗余副本;
+       清单/资源(json/pck/png)不动。 -->
+  <Target Name="CleanModOutput" AfterTargets="Build">
+    <ItemGroup>
+      <_JunkDll Include="$(OutputPath)**\*.dll;$(OutputPath)**\*.pdb"
+                Exclude="$(OutputPath)SampleModB.dll;$(OutputPath)SampleModB.pdb" />
+    </ItemGroup>
+    <Delete Files="@(_JunkDll)" />
+  </Target>
+
+</Project>
