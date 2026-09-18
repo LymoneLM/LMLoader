@@ -64,6 +64,7 @@ public class ConfigWatcherTests : IDisposable
 		File.WriteAllText(PathOf("com.a.b"), "[patch]\nm = 9\n");
 
 		Eventually(() => entry.Value == 9);
+		Eventually(() => fired == 1); // 值写入与事件派发相邻,轮询避开观测窗口
 		Assert.Equal(1, fired);
 	}
 
@@ -86,6 +87,7 @@ public class ConfigWatcherTests : IDisposable
 		File.WriteAllText(PathOf("com.a.b"), "[patch]\nm = 8\n");
 
 		Eventually(() => entry.Value == 8);
+		Eventually(() => fired == 1); // 值写入与事件派发相邻,轮询避开观测窗口
 		Assert.Equal(1, fired);
 	}
 
