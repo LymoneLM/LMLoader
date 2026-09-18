@@ -2,6 +2,12 @@
 
   <!-- 公共属性见根目录 Directory.Build.props;GodotSharp 版本在 Directory.Packages.props(CPM)。
        可选组件:仅日志窗口,游戏宿主按需引用;类型全部由代码 new 出(不注册 Godot 脚本)。 -->
+  <PropertyGroup>
+    <PackageId>LMLoader.UI</PackageId>
+    <Description>LMLoader optional log window: level-filtered log view and load summary report (F12 toggle via bridge).</Description>
+    <PackageTags>godot;modding;mod-loader;logging</PackageTags>
+  </PropertyGroup>
+
   <ItemGroup>
     <PackageReference Include="GodotSharp" />
   </ItemGroup>

@@ -1,6 +1,12 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
   <!-- 公共属性见根目录 Directory.Build.props;GodotSharp 版本在 Directory.Packages.props(CPM) -->
+  <PropertyGroup>
+    <PackageId>LMLoader.GodotBridge</PackageId>
+    <Description>LMLoader Godot bridge: autoload bootstrap, pck mounting in load order, SceneTree event facade.</Description>
+    <PackageTags>godot;modding;mod-loader;modloader</PackageTags>
+  </PropertyGroup>
+
   <ItemGroup>
     <PackageReference Include="GodotSharp" />
   </ItemGroup>

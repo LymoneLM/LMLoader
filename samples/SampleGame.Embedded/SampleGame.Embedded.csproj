@@ -1,5 +1,11 @@
 <Project Sdk="Godot.NET.Sdk/4.7.2">
 
+  <!-- 样例游戏:不产 NuGet 包 -->
+  <PropertyGroup>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+
+
   <!-- 样例游戏:内嵌版接入演示;Godot.NET.Sdk 版本与 spike 基线一致 -->
   <PropertyGroup>
     <TargetFramework>net8.0</TargetFramework>

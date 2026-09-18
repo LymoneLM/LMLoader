@@ -1,6 +1,12 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
   <!-- 公共属性见根目录 Directory.Build.props -->
+  <PropertyGroup>
+    <PackageId>LMLoader.Core</PackageId>
+    <Description>LMLoader core: mod scanning, manifest, dependency planning, lifecycle, config and logging. Pure C#, no Godot/HarmonyX references (D1/D14).</Description>
+    <PackageTags>godot;modding;mod-loader;modloader</PackageTags>
+  </PropertyGroup>
+
   <ItemGroup>
     <ProjectReference Include="..\LMLoader.Api\LMLoader.Api.csproj" />
   </ItemGroup>

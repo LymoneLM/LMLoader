@@ -1,5 +1,10 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
+  <!-- 样例工程:不产 NuGet 包 -->
+  <PropertyGroup>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+
   <!-- 样例模组 B:演示依赖链(D8)、跨模组服务消费(D4 强类型直引通道)与独立配置文件(D11)。
        构建产物落到样例游戏的第二个 mods 子目录;SampleMod 以编译期引用(不随包分发,运行期由其所在目录解析)。 -->
   <PropertyGroup>
