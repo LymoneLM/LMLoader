@@ -589,6 +589,13 @@ public static class ModManifestReader
 			return false;
 		}
 
+		// Windows 盘符路径(C:\、C:/)在任何平台都算绝对:清单应跨平台可移植
+		// (Path.IsPathRooted("C:/x") 在 Linux 返回 false,CI ubuntu 首跑实证)
+		if (path.Length >= 2 && path[1] == ':' && char.IsAsciiLetter(path[0]))
+		{
+			return false;
+		}
+
 		if (Path.IsPathRooted(path))
 		{
 			return false;
