@@ -21,6 +21,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\src\LMLoader.Core\LMLoader.Core.csproj" />
+    <ProjectReference Include="..\..\src\LMLoader.Distribution.Thunderstore\LMLoader.Distribution.Thunderstore.csproj" />
   </ItemGroup>
 
 </Project>

@@ -30,6 +30,9 @@ public sealed class ModManifest
 	/// <summary>展示用标签(v1.0 新增,D9 迭代);loader 本体不消费,供管理器/分发平台过滤。</summary>
 	public IReadOnlyList<string> Tags { get; init; } = Array.Empty<string>();
 
+	/// <summary>分发平台别名(D16);loader 本体不消费,供打包器生成平台 manifest。缺省 null。</summary>
+	public ModDistribution? Distribution { get; init; }
+
 	/// <summary>目标游戏标识,与宿主游戏约定比对,不匹配拒载(D9)。</summary>
 	public required string GameId { get; init; }
 
@@ -71,3 +74,9 @@ public sealed record ModuleDependency(string Uid, SemVer? Version, bool Soft)
 	/// <summary>版本区间声明(阶段 5);解析失败或未声明为 null(此时回退 <see cref="Version"/>)。</summary>
 	public VersionRange? Range { get; init; }
 }
+
+/// <summary>
+/// 分发平台别名声明(D16)。UID 为运行时唯一身份;此处仅为打包器向分发平台映射身份提供显式来源。
+/// Thunderstore:name 缺省 = UID 尾段(`.`→`_`);team 无缺省(打包时缺失报错)。
+/// </summary>
+public sealed record ModDistribution(string? ThunderstoreTeam, string? ThunderstoreName = null);

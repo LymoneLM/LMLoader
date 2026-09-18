@@ -92,6 +92,7 @@ public static class ModManifestReader
 			var icon = GetOptionalString(properties, "icon");
 			var website = GetOptionalString(properties, "website");
 			var tags = ReadStringArray(properties, "tags", warnings); // v1.0:展示字段(D9 迭代)
+			var distribution = ReadDistribution(properties, errors, warnings);
 
 			if (okUid && !IsValidUid(uid))
 			{
@@ -178,6 +179,7 @@ public static class ModManifestReader
 				Icon = icon,
 				Website = website,
 				Tags = tags,
+				Distribution = distribution,
 				GameId = gameId,
 				LoaderVersion = loaderVersion,
 				EntryAssembly = entryAssembly,
@@ -414,7 +416,7 @@ public static class ModManifestReader
 	private static readonly string[] KnownTopLevelFields =
 	[
 		"schemaVersion", "uid", "name", "version", "authors", "description",
-		"icon", "website", "tags", "gameId", "loaderVersion", "entry", "resources",
+		"icon", "website", "tags", "gameId", "loaderVersion", "entry", "resources", "distribution",
 	];
 
 	private static string[] KnownNestedFields(string path) =>
@@ -428,6 +430,42 @@ public static class ModManifestReader
 					"resources" => ["pck"],
 					_ => Array.Empty<string>(),
 				};
+
+	/// <summary>读入 distribution(D16 分发别名);结构不对仅警告并忽略(loader 不消费此字段)。</summary>
+	private static ModDistribution? ReadDistribution(
+		Dictionary<string, JsonElement> properties, List<string> errors, List<string> warnings)
+	{
+		if (!properties.TryGetValue("distribution", out var distributionElement))
+		{
+			return null;
+		}
+
+		if (distributionElement.ValueKind != JsonValueKind.Object)
+		{
+			errors.Add("distribution: 必须是对象");
+			return null;
+		}
+
+		if (!distributionElement.TryGetProperty("thunderstore", out var ts) || ts.ValueKind != JsonValueKind.Object)
+		{
+			warnings.Add("distribution: 无 thunderstore 节,忽略");
+			return null;
+		}
+
+		string? team = ts.TryGetProperty("team", out var teamElement) && teamElement.ValueKind == JsonValueKind.String
+			? teamElement.GetString()
+			: null;
+		string? name = ts.TryGetProperty("name", out var nameElement) && nameElement.ValueKind == JsonValueKind.String
+			? nameElement.GetString()
+			: null;
+		if (team is null && name is null)
+		{
+			warnings.Add("distribution.thunderstore: team/name 均缺省,忽略");
+			return null;
+		}
+
+		return new ModDistribution(team, name);
+	}
 
 	private static string[] ReadStringArray(
 		Dictionary<string, JsonElement> properties,

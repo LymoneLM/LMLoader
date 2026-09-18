@@ -170,10 +170,24 @@ public sealed class VersionRange
 			VersionBound.Inclusive(version), VersionBound.Exclusive(upper), "~" + version);
 	}
 
+	/// <summary>取区间下界:<paramref name="inclusive"/> 为 false 表示开下界(&gt;v);无界返回 false。</summary>
+	public bool TryGetLowerBound(out SemVer bound, out bool inclusive)
+	{
+		if (_lower.IsUnbounded)
+		{
+			bound = default;
+			inclusive = false;
+			return false;
+		}
+
+		bound = _lower.Version;
+		inclusive = _lower.IsInclusive;
+		return true;
+	}
+
 	/// <summary>版本是否落在区间内。</summary>
 	public bool Contains(SemVer version)
-	{
-		if (!_lower.IsUnbounded)
+	{		if (!_lower.IsUnbounded)
 		{
 			var lowerCompare = version.CompareTo(_lower.Version);
 			if (_lower.IsInclusive ? lowerCompare < 0 : lowerCompare <= 0)

@@ -1,0 +1,9 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- 公共属性见根目录 Directory.Build.props。
+       分发适配器(D16):Thunderstore manifest 读/写与打包校验;loader 运行时不消费。 -->
+  <ItemGroup>
+    <ProjectReference Include="..\LMLoader.Core\LMLoader.Core.csproj" />
+  </ItemGroup>
+
+</Project>
