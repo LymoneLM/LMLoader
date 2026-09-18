@@ -11,6 +11,9 @@ public class DependencyPlannerTests
 
 	private static ModuleDependency Soft(string uid) => new(uid, null, Soft: true);
 
+	private static ModuleDependency HardRange(string uid, string range) =>
+		new(uid, null, Soft: false) { Range = VersionRange.Parse(range) };
+
 	private static ModuleEntry Module(string uid, params ModuleDependency[] depends) =>
 		new() { Uid = uid, Type = $"Test.{uid.Replace('.', '_')}", Depends = depends };
 
@@ -22,7 +25,7 @@ public class DependencyPlannerTests
 			Name = uid,
 			Version = SemVer.Parse(version),
 			GameId = "com.game.test",
-			LoaderVersion = SemVer.Parse("1.0.0"),
+			LoaderVersion = VersionRange.Parse("1.0.0"),
 			EntryAssembly = "Mod.dll",
 			Modules = modules,
 			SourcePath = $"{uid}.mod.json",
@@ -209,5 +212,46 @@ public class DependencyPlannerTests
 		var cSkip = Assert.Single(plan.Skipped, s => s.ModuleUid == "com.t.c.main");
 		Assert.Contains("com.t.dup", cSkip.Reason);
 		Assert.Equal(2, plan.Skipped.Count(s => s.ModuleUid == "com.t.dup"));
+	}
+
+	[Fact]
+	public void 区间语义_版本落在区间内_正常加载()
+	{
+		var plan = Plan(
+			Mod("com.t.y", "1.4.0", Module("com.t.y.main")),
+			Mod("com.t.x", "1.0.0", Module("com.t.x.main", HardRange("com.t.y.main", "^1.2.0"))));
+
+		Assert.Empty(plan.Skipped);
+		Assert.Equal(2, plan.Ordered.Count);
+	}
+
+	[Fact]
+	public void 区间语义_版本不在区间内_依赖方跳过()
+	{
+		var plan = Plan(
+			Mod("com.t.y", "2.4.0", Module("com.t.y.main")),
+			Mod("com.t.x", "1.0.0", Module("com.t.x.main", HardRange("com.t.y.main", "^1.2.0"))));
+
+		Assert.False(plan.BatchRejected);
+		Assert.Equal(["com.t.y.main"], plan.Ordered.Select(m => m.ModuleUid));
+		Assert.Contains(plan.Skipped, s => s.ModuleUid == "com.t.x.main" && s.Reason.Contains("版本不满足"));
+		Assert.Contains(plan.Skipped, s => s.ModuleUid == "com.t.x.main" && s.Reason.Contains("^1.2.0"));
+	}
+
+	[Fact]
+	public void 区间语义_上限开区间_端点版本被拒()
+	{
+		var plan = Plan(
+			Mod("com.t.y", "2.0.0", Module("com.t.y.main")),
+			Mod("com.t.x", "1.0.0", Module("com.t.x.main", HardRange("com.t.y.main", ">=1.0.0"))));
+
+		// >=1.0.0 无上限,2.0.0 满足 → 正常
+		Assert.Empty(plan.Skipped);
+
+		var plan2 = Plan(
+			Mod("com.t.y", "2.0.0", Module("com.t.y.main")),
+			Mod("com.t.x", "1.0.0", Module("com.t.x.main", HardRange("com.t.y.main", "<2.0.0"))));
+
+		Assert.Contains(plan2.Skipped, s => s.ModuleUid == "com.t.x.main" && s.Reason.Contains("版本不满足"));
 	}
 }

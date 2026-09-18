@@ -98,13 +98,13 @@ public sealed class ModManager : IDisposable
 				continue;
 			}
 
-			// ---- 3. loaderVersion 校验(v1 精确匹配;区间语法阶段 5) ----
+			// ---- 3. loaderVersion 校验(阶段 5:区间语义;裸精确清单天然兼容) ----
 			var apiVersion = _options.ApiVersion ?? typeof(LmModule).Assembly.GetName().Version!;
-			var required = new SemVer(apiVersion.Major, apiVersion.Minor, Math.Max(apiVersion.Build, 0));
-			if (manifest.LoaderVersion != required)
+			var apiSemVer = new SemVer(apiVersion.Major, apiVersion.Minor, Math.Max(apiVersion.Build, 0));
+			if (!manifest.LoaderVersion.Contains(apiSemVer))
 			{
 				manifestFailures.Add((manifestPath,
-					$"loaderVersion 不满足: 清单要求 {manifest.LoaderVersion},当前加载器 API {required}(v1 仅精确匹配)"));
+					$"loaderVersion 不满足: 清单要求 {manifest.LoaderVersion},当前加载器 API {apiSemVer}"));
 				continue;
 			}
 

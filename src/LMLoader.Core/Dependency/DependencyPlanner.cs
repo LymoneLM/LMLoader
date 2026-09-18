@@ -89,8 +89,16 @@ public static class DependencyPlanner
 						break;
 					}
 
-					// v1 精确版本:依赖声明的版本须与目标模组版本一致(build 元数据不影响相等性)
-					if (dependency.Version is { } required && required != target.Mod.Version)
+					// 阶段 5:区间语义优先(Range 非空);裸精确声明走 Version 字段(旧清单兼容)
+					if (dependency.Range is { } range && !range.Contains(target.Mod.Version))
+					{
+						Fail(active, removalCause, skipped, node,
+							$"硬依赖 \"{dependency.Uid}\" 版本不满足:声明 {range},实际 {target.Mod.Version}");
+						progressed = true;
+						break;
+					}
+
+					if (dependency.Range is null && dependency.Version is { } required && required != target.Mod.Version)
 					{
 						Fail(active, removalCause, skipped, node,
 							$"硬依赖 \"{dependency.Uid}\" 版本不满足:声明 {required},实际 {target.Mod.Version}");

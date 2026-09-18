@@ -30,8 +30,8 @@ public sealed class ModManifest
 	/// <summary>目标游戏标识,与宿主游戏约定比对,不匹配拒载(D9)。</summary>
 	public required string GameId { get; init; }
 
-	/// <summary>依赖的 LMLoader API 版本(v1 仅精确版本,区间语法阶段 5)。</summary>
-	public required SemVer LoaderVersion { get; init; }
+	/// <summary>依赖的 LMLoader API 版本区间(阶段 5 起支持 ^ ~ 比较符等;裸精确版本天然兼容)。</summary>
+	public required VersionRange LoaderVersion { get; init; }
 
 	/// <summary>模组 DLL 文件名(相对模组目录)。</summary>
 	public required string EntryAssembly { get; init; }
@@ -62,5 +62,9 @@ public sealed class ModuleEntry
 	public IReadOnlyList<ModuleDependency> Depends { get; init; } = Array.Empty<ModuleDependency>();
 }
 
-/// <summary>模块依赖声明。</summary>
-public sealed record ModuleDependency(string Uid, SemVer? Version, bool Soft);
+/// <summary>模块依赖声明。<c>Version</c>/<c>Range</c> 二选一:区间为 null 时保留精确语义(旧清单兼容)。</summary>
+public sealed record ModuleDependency(string Uid, SemVer? Version, bool Soft)
+{
+	/// <summary>版本区间声明(阶段 5);解析失败或未声明为 null(此时回退 <see cref="Version"/>)。</summary>
+	public VersionRange? Range { get; init; }
+}

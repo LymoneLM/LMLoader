@@ -104,8 +104,8 @@ public static class ModManifestReader
 				okVersion = false;
 			}
 
-			SemVer loaderVersion = default;
-			if (okLoaderVersion && !SemVer.TryParse(loaderVersionText, out loaderVersion))
+			VersionRange loaderVersion = default!;
+			if (okLoaderVersion && !VersionRange.TryParse(loaderVersionText, out loaderVersion!))
 			{
 				errors.Add(FormatVersionError("loaderVersion", loaderVersionText));
 				okLoaderVersion = false;
@@ -287,14 +287,20 @@ public static class ModManifestReader
 			}
 
 			SemVer? version = null;
+			VersionRange? range = null;
 			if (properties.TryGetValue("version", out var versionElement))
 			{
 				if (versionElement.ValueKind == JsonValueKind.String)
 				{
 					var versionText = versionElement.GetString() ?? "";
-					if (SemVer.TryParse(versionText, out var parsed))
+					// 阶段 5:优先按区间解析(^ ~ 比较符);裸精确版本两者皆可,区间保留原语法
+					if (VersionRange.TryParse(versionText, out var parsedRange))
 					{
-						version = parsed;
+						range = parsedRange;
+						if (SemVer.TryParse(versionText, out var parsedExact))
+						{
+							version = parsedExact; // 精确语义回退(SemVer.TryParse 对裸精确成功)
+						}
 					}
 					else
 					{
@@ -320,7 +326,7 @@ public static class ModManifestReader
 				}
 			}
 
-			result.Add(new ModuleDependency(uid, version, soft));
+			result.Add(new ModuleDependency(uid, version, soft) { Range = range });
 		}
 
 		return result.ToArray();
