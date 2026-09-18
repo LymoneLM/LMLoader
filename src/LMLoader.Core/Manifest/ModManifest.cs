@@ -27,6 +27,9 @@ public sealed class ModManifest
 
 	public string? Website { get; init; }
 
+	/// <summary>展示用标签(v1.0 新增,D9 迭代);loader 本体不消费,供管理器/分发平台过滤。</summary>
+	public IReadOnlyList<string> Tags { get; init; } = Array.Empty<string>();
+
 	/// <summary>目标游戏标识,与宿主游戏约定比对,不匹配拒载(D9)。</summary>
 	public required string GameId { get; init; }
 

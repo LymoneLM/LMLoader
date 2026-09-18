@@ -91,6 +91,7 @@ public static class ModManifestReader
 			var description = GetOptionalString(properties, "description");
 			var icon = GetOptionalString(properties, "icon");
 			var website = GetOptionalString(properties, "website");
+			var tags = ReadStringArray(properties, "tags", warnings); // v1.0:展示字段(D9 迭代)
 
 			if (okUid && !IsValidUid(uid))
 			{
@@ -176,6 +177,7 @@ public static class ModManifestReader
 				Description = description,
 				Icon = icon,
 				Website = website,
+				Tags = tags,
 				GameId = gameId,
 				LoaderVersion = loaderVersion,
 				EntryAssembly = entryAssembly,
@@ -412,7 +414,7 @@ public static class ModManifestReader
 	private static readonly string[] KnownTopLevelFields =
 	[
 		"schemaVersion", "uid", "name", "version", "authors", "description",
-		"icon", "website", "gameId", "loaderVersion", "entry", "resources",
+		"icon", "website", "tags", "gameId", "loaderVersion", "entry", "resources",
 	];
 
 	private static string[] KnownNestedFields(string path) =>

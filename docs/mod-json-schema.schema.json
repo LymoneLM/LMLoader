@@ -2,7 +2,7 @@
   "$schema": "http://json-schema.org/draft-07/schema#",
   "$id": "https://github.com/LymoneLM/LMLoader/docs/mod-json-schema.schema.json",
   "title": "LMLoader mod.json",
-  "description": "LMLoader 模组清单 v0.1(决策 D9)。注意:本 schema 供作者侧 lint 严格校验;加载器运行时更宽容(未知字段忽略+警告)。",
+  "description": "LMLoader 模组清单 v1.0(决策 D9,阶段 5 收口)。注意:本 schema 供作者侧 lint 严格校验;加载器运行时更宽容(未知字段忽略+警告)。",
   "type": "object",
   "additionalProperties": false,
   "required": ["schemaVersion", "uid", "name", "version", "gameId", "loaderVersion", "entry"],
@@ -26,6 +26,11 @@
       "pattern": "^(?!res:|file:|/|[A-Za-z]:)[^\\0]+$"
     },
     "website": { "type": "string" },
+    "tags": {
+      "type": "array",
+      "description": "展示用标签(v1.0 新增);loader 本体不消费",
+      "items": { "type": "string", "minLength": 1 }
+    },
     "gameId": {
       "type": "string",
       "minLength": 1,
@@ -33,8 +38,8 @@
       "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*$"
     },
     "loaderVersion": {
-      "$ref": "#/definitions/semver",
-      "description": "依赖的 LMLoader API 版本;v1 仅接受精确 SemVer,区间语法阶段 5 落地"
+      "$ref": "#/definitions/versionRange",
+      "description": "依赖的 LMLoader API 版本区间(v1.0 起;裸精确版本兼容)"
     },
     "entry": {
       "type": "object",
@@ -75,6 +80,11 @@
       "pattern": "^[a-zA-Z][a-zA-Z0-9_-]*(\\.[a-zA-Z][a-zA-Z0-9_-]*)+$",
       "maxLength": 128
     },
+    "versionRange": {
+      "type": "string",
+      "description": "版本区间:^ ~ >= > <= < = 精确 与 *;单声明内禁止空格/逗号组合",
+      "pattern": "^(\\*|((\\^|~>?:?|>=|<=|>|<|=)?(0|[1-9]\\d*)(?:\\.(0|[1-9]\\d*))?(?:\\.(0|[1-9]\\d*))?(?:-((?:0|[1-9]\\d*|\\d*[a-zA-Z-][0-9a-zA-Z-]*)(?:\\.(?:0|[1-9]\\d*|\\d*[a-zA-Z-][0-9a-zA-Z-]*))*))?(?:\\+([0-9a-zA-Z-]+(?:\\.[0-9a-zA-Z-]+)*))?))$"
+    },
     "semver": {
       "type": "string",
       "description": "SemVer 2.0.0(官方正则)",
@@ -100,7 +110,7 @@
             "required": ["uid"],
             "properties": {
               "uid": { "$ref": "#/definitions/reverseDomain" },
-              "version": { "$ref": "#/definitions/semver" },
+              "version": { "$ref": "#/definitions/versionRange" },
               "soft": {
                 "type": "boolean",
                 "default": false,
