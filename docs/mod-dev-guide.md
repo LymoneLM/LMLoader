@@ -1,4 +1,4 @@
-# LMLoader mod 开发指南(v1.1 内嵌版)
+﻿# LMLoader mod 开发指南(v1.1 内嵌版)
 
 > 面向 mod 作者。配套:[API 参考](api-reference.md) · [mod.json 规范](mod-json-schema.md) · [配置详解](mod-config.md)。
 > 本指南把实测踩过的"坑"沉淀为惯例,遇到问题优先回查。
@@ -98,6 +98,8 @@ public class MyModule : LmMod
 - per-mod Harmony 实例约定 id = 模组 uid:`var patcher = new Harmony(Uid);`
 - **泛型方法定义不可 patch**(`MethodInfo` 是 definition 时 MonoMod 直接失败);
   关闭后 `MakeGenericMethod(typeof(...))` 得到的**具体实例化**可以。
+- **多线程中途 patch 安全**(P0-1 实测):后台线程高频调用目标方法时打入 detour,
+  patch 立即生效、无崩溃——但请自行保证 patch 目标与线程的竞态语义。
 - 反射按字符串查类型必须用**完整命名空间全名**——无命名空间的类无法被按名查找。
 - 不要把 HarmonyX 放进游戏依赖闭包(游戏 data 目录):导出构建的默认 ALC 会按 deps.json
   再解析出第二份 MonoMod,动态代理类型身份分裂,patch 必失败。

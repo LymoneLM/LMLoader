@@ -39,7 +39,8 @@ loader.BootCompleted += () => GD.Print(loader.LastLoadResult?.SummaryText);
 - **开发机排障第一课**:运行期加载的是 exe 旁的物理 mods 目录;编辑器里改了模组源码后,
   `res://mods` 与导出目录的副本是**手动部署**的——先确认磁盘上那份 dll 的时间戳,再怀疑框架
   (P4-1 实录:陈旧副本让新模组"看似失效",误诊半天)。
-- 导出游戏后:`rm -rf build/mods && cp -r mods build/mods` 重新部署副本。
+- 导出游戏:输出目录必须**预先存在**(Godot 不会自建,否则报"给定的导出路径不存在");
+  导出后 `rm -rf build/mods && cp -r mods build/mods` 重新部署副本。
 
 ## Steam Workshop 接线
 

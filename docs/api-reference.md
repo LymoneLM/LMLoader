@@ -1,4 +1,4 @@
-# LMLoader API 参考(v1.1 内嵌版)
+﻿# LMLoader API 参考(v1.1 内嵌版)
 
 > 配套文档:[mod.json 规范](mod-json-schema.md) · [mod 开发指南](mod-dev-guide.md) · [模组配置](mod-config.md)
 > 本文按程序集划分,列出公开类型与成员语义。
@@ -281,7 +281,7 @@ CallDeferred(Godot 拒绝在父节点布置期间同步 AddChild 到根);延迟�
 
 | 成员 | 说明 |
 |---|---|
-| `GameId` / `ApiVersion` / `ModsRootOverride` / `GameAssemblyResolver` | 入树前设置 |
+| `GameId` / `ApiVersion` / `ModsRootOverride` / `GameAssemblyResolver` | 入树前设置;`GameAssemblyResolver` 经 Initialize 接入时自动解析调用方程序集(典型游戏零配置),多程序集游戏时显式覆盖 |
 | `BootCompleted` | 引导结束(成功/部分失败/无 mods);经 `LastLoadResult` 取结果 |
 | `LastLoadResult` | `LoadResult?`;无 mods 目录时 null |
 | `Services` | 跨模组服务注册表 |

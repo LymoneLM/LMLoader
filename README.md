@@ -61,7 +61,8 @@ public class MyModule : LmMod
 }
 ```
 
-`mods/MyMod/` 下放 `com.author.mymod.mod.json` + `MyMod.dll` 即可被自动发现:
+`mods/MyMod/` 下放 `com.author.mymod.mod.json` + `MyMod.dll` 即可被自动发现
+(或 `dotnet new install LMLoader.Templates && dotnet new lmmodule` 一键生成骨架):
 
 ```json
 {
@@ -71,8 +72,9 @@ public class MyModule : LmMod
   "mods": [ { "uid": "com.author.mymod", "assemblies": ["MyMod.dll"] } ]
 }
 ```
-完整指引:[mod 开发指南](docs/mod-dev-guide.md) · [API 参考](docs/api-reference.md) ·
-[mod.json 规范](docs/mod-json-schema.md) · [配置详解](docs/mod-config.md)。
+完整指引:[mod 开发指南](docs/mod-dev-guide.md) · [宿主接入指南](docs/host-guide.md) ·
+[API 参考](docs/api-reference.md) · [mod.json 规范](docs/mod-json-schema.md) ·
+[配置详解](docs/mod-config.md) · [架构](docs/architecture.md)。
 
 ## 包一览(v1.0)
 
@@ -81,7 +83,8 @@ public class MyModule : LmMod
 | `LMLoader.Embedded` | 游戏宿主接入(传递 Core/GodotBridge/UI) |
 | `LMLoader.Api` | 模组工程唯一引用(小而稳定,随 loaderVersion 语义化;`[LmMod]` 特性在此) |
 | `LMLoader.Core` / `GodotBridge` / `UI` | 分包依赖,宿主可单独消费 |
-| `LMLoader.Cli` | 作者工具:lint / pack-pck / pack-ts(源码随仓库,后续独立发包) |
+| `LMLoader.Cli` | 作者工具:lint / pack-pck / pack-ts(dotnet tool,`dotnet tool install -g LMLoader.Cli`) |
+| `LMLoader.Templates` | `dotnet new lmmodule` 模组工程模板 |
 
 ## 仓库结构
 
