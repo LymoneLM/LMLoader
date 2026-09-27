@@ -1,0 +1,18 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <!-- 把自带依赖(HarmonyX 链)拷进输出目录随模组分发(D14);Api 由 loader 统一供给 -->
+    <CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="LMLoader.Api" Version="1.1.0" />
+    <!-- 需要 patch 游戏/引擎方法时启用(HarmonyX 由模组自带,勿放进游戏目录):
+    <PackageReference Include="HarmonyX" Version="2.16.1" />
+    <PackageReference Include="MonoMod.RuntimeDetour" Version="25.3.6" />
+    -->
+  </ItemGroup>
+
+</Project>

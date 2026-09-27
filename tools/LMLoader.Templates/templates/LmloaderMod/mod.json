@@ -1,0 +1,8 @@
+{
+  "schemaVersion": 1,
+  "version": "1.0.0",
+  "gameId": "COM_MY_GAME",
+  "mods": [
+    { "uid": "COM_AUTHOR_MYMOD", "assemblies": [ "MyMod.dll" ] }
+  ]
+}

@@ -1,0 +1,29 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- dotnet new 模板包(草稿项目结构 tools/LMLoader.Templates):
+       dotnet new install <nupkg> 后 `dotnet new lmmodule` 生成模组工程骨架。
+       模板内容不参与编译:关闭默认 Compile 通配。 -->
+  <PropertyGroup>
+    <PackageType>Template</PackageType>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+    <IncludeContentInPack>true</IncludeContentInPack>
+    <IncludeBuildOutput>false</IncludeBuildOutput>
+    <ContentTargetFolders>content</ContentTargetFolders>
+    <Title>LMLoader 模组项目模板</Title>
+    <Description>Godot/C# 模组工程骨架:LmMod 基类 + [LmMod] 特性绑定 + mod.json 清单 + 作者惯例配置。</Description>
+    <PackageTags>dotnet-template;lmloader;godot;mod;modding</PackageTags>
+    <!-- 模板包无 lib 产物/无符号:NU5128 属预期豁免;关闭符号包(Directory.Build.props 全局开启会 NU5017) -->
+    <NoWarn>$(NoWarn);NU5128</NoWarn>
+    <IncludeSymbols>false</IncludeSymbols>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <None Include="README.md" Pack="true" PackagePath="" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Content Include="templates\**\*" Exclude="templates\**\bin\**;templates\**\obj\**" />
+  </ItemGroup>
+
+</Project>

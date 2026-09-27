@@ -1,0 +1,27 @@
+{
+  "$schema": "http://json.schemastore.org/template",
+  "author": "LymoneLM",
+  "classifications": ["Godot", "Modding"],
+  "identity": "LMLoader.Mod.CSharp",
+  "name": "LMLoader 模组",
+  "shortName": "lmmodule",
+  "description": "LMLoader 模组工程骨架:LmMod 基类 + [LmMod] 特性绑定 + mod.json 清单。",
+  "sourceName": "MyMod",
+  "tags": { "language": "C#", "type": "project" },
+  "symbols": {
+    "modUid": {
+      "type": "parameter",
+      "datatype": "string",
+      "defaultValue": "com.author.mymod",
+      "replaces": "COM_AUTHOR_MYMOD",
+      "description": "模组唯一标识(反向域名);必须与代码 [LmMod] 特性一致"
+    },
+    "gameId": {
+      "type": "parameter",
+      "datatype": "string",
+      "defaultValue": "com.my.game",
+      "replaces": "COM_MY_GAME",
+      "description": "目标游戏标识(与宿主约定;传空 = 通用模组)"
+    }
+  }
+}
