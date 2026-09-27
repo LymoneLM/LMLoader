@@ -17,6 +17,10 @@ public sealed class LoadResult
 	/// <summary>生命周期结果;整批拒绝(循环依赖)时为 null。</summary>
 	public Lifecycle.LifecycleReport? Lifecycle { get; init; }
 
+	/// <summary>本次发现的所有模组(含被禁用者;管理窗口/宿主枚举数据源,D19)。</summary>
+	public IReadOnlyList<Management.DiscoveredMod> DiscoveredMods { get; init; } =
+		Array.Empty<Management.DiscoveredMod>();
+
 	/// <summary>人可读加载汇总。</summary>
 	public required string SummaryText { get; init; }
 }

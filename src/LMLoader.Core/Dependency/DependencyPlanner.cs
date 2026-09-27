@@ -7,8 +7,10 @@ namespace LMLoader.Core.Dependency;
 
 /// <summary>
 /// 依赖图构建 + 模组级拓扑排序(依赖唯一来源为 mod.json 的 mods[].depends)。
-/// 语义(D18):
+/// 语义(D18/D19):
 /// - 以模组为节点(清单内多模组也互为节点),uid 跨清单全局唯一;
+/// - 状态禁用(D19):出现在 <paramref name="disabledReasons"/> 中的模组不进依赖图、
+///   单独记入跳过(原因自定,如"已禁用"/"全局开关关闭");硬依赖禁用模组 → 级联跳过并指明;
 /// - uid 冲突:同文件内重复(reader 已整份拒绝,此处防御性兜底)双方均跳过;
 ///   跨文件重复 → 先扫描者胜(主根先于附加根扫描),后者跳过、前者照常;
 /// - 硬依赖缺失/版本不满足 → 该模组放弃加载,并级联跳过硬依赖它的模组;
@@ -19,12 +21,14 @@ namespace LMLoader.Core.Dependency;
 /// </summary>
 public static class DependencyPlanner
 {
-	public static LoadPlan Plan(IReadOnlyList<ModManifest> manifests)
+	public static LoadPlan Plan(
+		IReadOnlyList<ModManifest> manifests,
+		IReadOnlyDictionary<string, string>? disabledReasons = null)
 	{
 		var skipped = new List<SkippedMod>();
 		var removalCause = new Dictionary<string, string>(StringComparer.Ordinal);
 
-		// ---- 1. 收集节点;uid 冲突:跨文件先扫描者胜,同文件内双方均跳过 ----
+		// ---- 0. 收集节点 + 状态禁用(D19):禁用者不进依赖图,单独记入跳过 ----
 		var allNodes = new List<Node>();
 		var byUid = new Dictionary<string, List<Node>>(StringComparer.Ordinal);
 
@@ -46,6 +50,22 @@ public static class DependencyPlanner
 
 		// 移除按节点身份标记(胜者与败者同 uid,不能按 uid 键过滤,否则胜者被误杀)
 		var removedNodes = new HashSet<Node>();
+
+		if (disabledReasons is { Count: > 0 })
+		{
+			foreach (var node in allNodes)
+			{
+				if (!disabledReasons.TryGetValue(node.Entry.Uid, out var reason))
+				{
+					continue;
+				}
+
+				removedNodes.Add(node);
+				skipped.Add(new SkippedMod { Uid = node.Entry.Uid, Reason = reason });
+			}
+		}
+
+		// ---- 1. uid 冲突:跨文件先扫描者胜,同文件内双方均跳过 ----
 		foreach (var group in byUid.Values.Where(l => l.Count > 1))
 		{
 			// manifests 已按扫描顺序排列(主根在前):跨文件冲突取首扫描者;
@@ -98,7 +118,9 @@ public static class DependencyPlanner
 
 					if (!active.TryGetValue(dependency.Uid, out var target))
 					{
-						var cause = removalCause.TryGetValue(dependency.Uid, out var c) ? c : "已被跳过";
+						var cause = removalCause.TryGetValue(dependency.Uid, out var c) ? c
+							: disabledReasons is not null && disabledReasons.TryGetValue(dependency.Uid, out var d) ? $"已禁用({d})"
+							: "已被跳过";
 						Fail(active, removalCause, skipped, node,
 							$"硬依赖 \"{dependency.Uid}\" 未加载({cause}),级联跳过");
 						progressed = true;

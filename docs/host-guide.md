@@ -87,6 +87,22 @@ loader.BootCompleted += () =>
 - 日志:`user://logs/LMLoader.log` 追加写 + 内存环形缓冲(日志窗口数据源);`OpenLogWindow()` /
   F12 切换。
 
+## 模组管理(启停开关,D19)
+
+- 玩家/宿主经管理窗口(`loader.OpenModManager()`,或直接调 `ModManager` API)开关模组;
+  状态落 `user://mod-state.toml`(与模组配置平级,模组更新不覆盖玩家选择)。
+- 三级粒度:全局总开关(纯净模式,排障用)→ 整包开关(UI 对清单内全部 uid 批量写入)→ 单模组开关。
+- **开关写入即时持久化,重启进程后生效**;loader 发 `ModStateChanged` 信号并暴露 `PendingRestart`
+  ——何时重启(保存→退出→拉起进程)由游戏决定,例如主菜单挂"重启以应用模组更改"按钮:
+
+```csharp
+loader.ModStateChanged += e => GD.Print(e.Summary); // e.DisabledUids / e.GlobalEnabled
+```
+
+- 关闭某模组前可查询影响面:`manager.PreviewDisable(uid)` 返回将因硬依赖缺失而无法加载的
+  传递依赖方(静态预览,不强制)。
+- 同进程重跑加载**不是**应用变更的手段(共享 ALC 不释放,二次实例化 = 变相热切换)。
+
 ## 已验证边界
 
 - Godot **4.7.2 stable / .NET 8** 编辑器与 Windows 导出构建双环境实证(patch 含 native→managed

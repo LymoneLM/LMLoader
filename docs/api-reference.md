@@ -160,6 +160,7 @@ public sealed class AcceptableValueList<T> : AcceptableValueBase where T : notnu
 | `GameAssemblyResolver` | null | 游戏程序集解析器(游戏程序集装在宿主自身 ALC,宿主按名供给) |
 | `AfterPlan` | null | 规划成功后回调(pck 挂载时机);整批拒绝时不调用 |
 | `ConfigRootPath` | null | 配置根目录;null = 关闭配置系统 |
+| `ModStatePath` | null | 模组启停状态文件路径(D19,`user://mod-state.toml` 全局化路径);null = 状态不持久化(内存态,缺省全启用无行为差异) |
 | `Strict` | false | 任一失败即中止;缺省宽松 |
 | `MinimumLogLevel` | `Info` | 最低日志级别 |
 
@@ -288,6 +289,8 @@ CallDeferred(Godot 拒绝在父节点布置期间同步 AddChild 到根);延迟�
 | `LogBuffer` | 内存环形日志(日志窗口数据源) |
 | `Configs` | 配置协调器;热重载已随引导自动开启 |
 | `OpenLogWindow()` | 打开/切换日志窗口;**F12** 默认切换 |
+| `OpenModManager()` | 打开/切换模组管理窗口(启停开关/依赖警告/重启提示,D19) |
+| `ModStateChanged` / `PendingRestart` / `GetDiscoveredMods()` | 启停管理面透传(D19);重启时机与方式由游戏决定 |
 | `GetModMountPoint(string modUid)` | `/root/LMLoader/Mods/<uid>` 挂载点;仅加载成功的模组 |
 | `RunBoot()` | 显式引导(幂等);延迟入树路径由 Initialize 自动调用 |
 
