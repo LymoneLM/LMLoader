@@ -1,4 +1,4 @@
-using System.Reflection;
+﻿using System.Reflection;
 using LMLoader.Api;
 using LMLoader.Core.Loading;
 using LMLoader.Core.Tests.TestInfrastructure;
@@ -29,7 +29,7 @@ public class ModAssemblyLoaderTests : IDisposable
 		return path;
 	}
 
-	private string ApiDll => typeof(LmModule).Assembly.Location;
+	private string ApiDll => typeof(LmMod).Assembly.Location;
 
 	[Trait("Category", "UsesFileSystem")]
 	[Fact]
@@ -183,7 +183,7 @@ public class ModAssemblyLoaderTests : IDisposable
 
 	[Trait("Category", "UsesFileSystem")]
 	[Fact]
-	public void 继承LmModule的模组类型可加载与实例化()
+	public void 继承LmMod的模组类型可加载与实例化()
 	{
 		var modDir = Dir("lmmod");
 		var modDll = TestCompiler.CompileToDirectory(modDir, "RealShapeMod", """
@@ -192,7 +192,8 @@ public class ModAssemblyLoaderTests : IDisposable
 
 			namespace Fixture;
 
-			public sealed class ShapeModule : LmModule
+			[LmMod("com.t.shape")]
+			public sealed class ShapeModule : LmMod
 			{
 			    public List<string> Log { get; } = new();
 
@@ -200,15 +201,15 @@ public class ModAssemblyLoaderTests : IDisposable
 			}
 			""", ApiDll);
 
-		using var loader = new ModAssemblyLoader(new RecordingLogger(), sharedLibraries: [typeof(LmModule).Assembly]);
+		using var loader = new ModAssemblyLoader(new RecordingLogger(), sharedLibraries: [typeof(LmMod).Assembly]);
 		var assembly = loader.LoadModAssembly("com.t.shape", modDll);
 
-		var module = (LmModule)Activator.CreateInstance(assembly.GetType("Fixture.ShapeModule")!)!;
-		module.Attach(new LmModuleContext("com.t.shape.main", "com.t.shape", modDir, new RecordingLogger()));
-		module.OnLoad();
+		var mod = (LmMod)Activator.CreateInstance(assembly.GetType("Fixture.ShapeModule")!)!;
+		mod.Attach(new LmModContext("com.t.shape", modDir, new RecordingLogger()));
+		mod.OnLoad();
 
-		var log = (List<string>)module.GetType().GetProperty("Log")!.GetValue(module)!;
-		Assert.Equal("load:com.t.shape.main", log[0]);
+		var log = (List<string>)mod.GetType().GetProperty("Log")!.GetValue(mod)!;
+		Assert.Equal("load:com.t.shape", log[0]);
 	}
 
 	public void Dispose() => TryDelete(_root);

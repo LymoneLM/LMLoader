@@ -1,7 +1,9 @@
 using System.IO.Compression;
+using LMLoader.Api;
 using LMLoader.Cli.Lint;
 using LMLoader.Cli.Pack;
 using LMLoader.Core.Manifest;
+using LMLoader.Core.Tests.TestInfrastructure;
 using LMLoader.Distribution.Thunderstore;
 
 namespace LMLoader.Core.Tests.Cli;
@@ -26,14 +28,12 @@ public class ModLinterTests : IDisposable
 	private const string GoodManifest = """
 		{
 		  "schemaVersion": 1,
-		  "uid": "com.author.modname",
 		  "name": "示例",
 		  "version": "1.0.0",
 		  "description": "demo",
 		  "tags": ["content"],
 		  "gameId": "com.game.test",
-		  "loaderVersion": "^1.0.0",
-		  "entry": { "assembly": "Mod.dll", "modules": [ { "uid": "com.author.modname.main", "type": "A.B.M" } ] }
+		  "mods": [ { "uid": "com.author.modname", "assemblies": ["Mod.dll"] } ]
 		}
 		""";
 
@@ -41,7 +41,17 @@ public class ModLinterTests : IDisposable
 	{
 		Directory.CreateDirectory(_dir);
 		File.WriteAllText(Path.Combine(_dir, "com.author.modname.mod.json"), manifest);
-		File.WriteAllText(Path.Combine(_dir, "Mod.dll"), "fake"); // 入口程序集占位
+
+		// 真实 PE dll(带 [LmMod] 特性):供 lint 元数据交叉校验
+		TestCompiler.CompileToDirectory(_dir, "Mod", """
+			using LMLoader.Api;
+
+			[LmMod("com.author.modname")]
+			public class M : LmMod
+			{
+			}
+			""", typeof(LmMod).Assembly.Location);
+
 		if (extraFile is not null)
 		{
 			File.WriteAllText(Path.Combine(_dir, extraFile), extraContent ?? "");
@@ -49,7 +59,7 @@ public class ModLinterTests : IDisposable
 	}
 
 	[Fact]
-	public void 干净模组_通过且仅质量提示()
+	public void 干净模组_通过且无错误()
 	{
 		WriteMod(GoodManifest);
 		var result = ModLinter.Lint(_dir);
@@ -90,25 +100,25 @@ public class ModLinterTests : IDisposable
 	}
 
 	[Fact]
-	public void 模块依赖未知字段_严格报错()
+	public void 模组依赖未知字段_严格报错()
 	{
 		WriteMod(GoodManifest.Replace(
-			"\"type\": \"A.B.M\" } ]",
-			"\"type\": \"A.B.M\", \"priority\": 5 } ]"));
+			"\"assemblies\": [\"Mod.dll\"] } ]",
+			"\"assemblies\": [\"Mod.dll\"], \"depends\": [ { \"uid\": \"com.other.core\", \"priority\": 5 } ] } ]"));
 
 		var result = ModLinter.Lint(_dir);
 
 		Assert.False(result.Success);
-		Assert.Contains(result.Issues, i => i.IsError && i.Message.Contains("未知字段: entry.modules[].priority"));
+		Assert.Contains(result.Issues, i => i.IsError && i.Message.Contains("未知字段: mods[].depends[].priority"));
 	}
 
 	[Fact]
 	public void 嵌套依赖的合法字段不误报()
 	{
-		// 回归:depends[] 嵌在 modules[] 内,字段表曾被错用模块集(uid/type/depends)
+		// 回归:depends[] 嵌在 mods[] 内,字段表曾被错用模组集
 		WriteMod(GoodManifest.Replace(
-			"\"type\": \"A.B.M\" } ]",
-			"\"type\": \"A.B.M\", \"depends\": [ { \"uid\": \"com.other.core\", \"version\": \"^1.0.0\", \"soft\": false } ] } ]"));
+			"\"assemblies\": [\"Mod.dll\"] } ]",
+			"\"assemblies\": [\"Mod.dll\"], \"depends\": [ { \"uid\": \"com.other.core\", \"version\": \"^1.0.0\", \"soft\": false } ] } ]"));
 
 		var result = ModLinter.Lint(_dir);
 
@@ -116,7 +126,7 @@ public class ModLinterTests : IDisposable
 	}
 
 	[Fact]
-	public void 入口程序集缺失_报错()
+	public void assemblies文件缺失_报错()
 	{
 		Directory.CreateDirectory(_dir);
 		File.WriteAllText(Path.Combine(_dir, "com.author.modname.mod.json"), GoodManifest);
@@ -124,15 +134,15 @@ public class ModLinterTests : IDisposable
 		var result = ModLinter.Lint(_dir);
 
 		Assert.False(result.Success);
-		Assert.Contains(result.Issues, i => i.IsError && i.Message.Contains("entry.assembly 文件不存在"));
+		Assert.Contains(result.Issues, i => i.IsError && i.Message.Contains("assemblies 文件不存在"));
 	}
 
 	[Fact]
 	public void 声明的pck缺失_报错_存在则过()
 	{
 		WriteMod(GoodManifest.Replace(
-			"\"entry\":",
-			"\"resources\": { \"pck\": [\"pack.pck\"] }, \"entry\":"));
+			"\"assemblies\": [\"Mod.dll\"]",
+			"\"assemblies\": [\"Mod.dll\"], \"pck\": [\"pack.pck\"]"));
 
 		Assert.False(ModLinter.Lint(_dir).Success);
 
@@ -144,10 +154,10 @@ public class ModLinterTests : IDisposable
 	[Fact]
 	public void 运行时宽容警告升级为error_如非法pck路径被忽略()
 	{
-		// resources.pck 含绝对路径:运行时忽略该项继续,lint 必须挡下
+		// pck 含绝对路径:运行时忽略该项继续,lint 必须挡下
 		WriteMod(GoodManifest.Replace(
-			"\"entry\":",
-			"\"resources\": { \"pck\": [\"C:/abs.pck\"] }, \"entry\":"));
+			"\"assemblies\": [\"Mod.dll\"]",
+			"\"assemblies\": [\"Mod.dll\"], \"pck\": [\"C:/abs.pck\"]"));
 
 		var result = ModLinter.Lint(_dir);
 
@@ -172,16 +182,74 @@ public class ModLinterTests : IDisposable
 	}
 
 	[Fact]
+	public void gameId缺省_质量提示不失败_D18()
+	{
+		WriteMod(GoodManifest.Replace("\"gameId\": \"com.game.test\",", ""));
+
+		var result = ModLinter.Lint(_dir);
+
+		Assert.True(result.Success);
+		Assert.Contains(result.Issues, i => !i.IsError && i.Message.Contains("未声明 gameId"));
+	}
+
+	[Fact]
+	public void 清单uid与特性uid不一致_双向报错_D18()
+	{
+		// 代码侧特性 uid ≠ 清单 uid:声明方无类(error)+ 孤立类(warning)
+		Directory.CreateDirectory(_dir);
+		File.WriteAllText(Path.Combine(_dir, "com.author.modname.mod.json"), GoodManifest);
+		TestCompiler.CompileToDirectory(_dir, "Mod", """
+			using LMLoader.Api;
+
+			[LmMod("com.author.other")]
+			public class M : LmMod
+			{
+			}
+			""", typeof(LmMod).Assembly.Location);
+
+		var result = ModLinter.Lint(_dir);
+
+		Assert.False(result.Success);
+		Assert.Contains(result.Issues, i => i.IsError && i.Message.Contains("没有标注 [LmMod(\"com.author.modname\")]"));
+		Assert.Contains(result.Issues, i => !i.IsError && i.Message.Contains("未声明的 [LmMod(\"com.author.other\")]"));
+	}
+
+	[Fact]
+	public void 同uid多类型声明_绑定歧义报错_D18()
+	{
+		Directory.CreateDirectory(_dir);
+		File.WriteAllText(Path.Combine(_dir, "com.author.modname.mod.json"), GoodManifest);
+		TestCompiler.CompileToDirectory(_dir, "Mod", """
+			using LMLoader.Api;
+
+			[LmMod("com.author.modname")]
+			public class M1 : LmMod
+			{
+			}
+
+			[LmMod("com.author.modname")]
+			public class M2 : LmMod
+			{
+			}
+			""", typeof(LmMod).Assembly.Location);
+
+		var result = ModLinter.Lint(_dir);
+
+		Assert.False(result.Success);
+		Assert.Contains(result.Issues, i => i.IsError && i.Message.Contains("绑定歧义"));
+	}
+
+	[Fact]
 	public void thunderstore别名_非法包名报错_合法通过()
 	{
 		WriteMod(GoodManifest.Replace(
-			"\"entry\":",
-			"\"distribution\": { \"thunderstore\": { \"team\": \"Author\", \"name\": \"bad-name\" } }, \"entry\":"));
+			"\"gameId\": \"com.game.test\",",
+			"\"gameId\": \"com.game.test\", \"distribution\": { \"thunderstore\": { \"team\": \"Author\", \"name\": \"bad-name\" } },"));
 		Assert.False(ModLinter.Lint(_dir).Success);
 
 		WriteMod(GoodManifest.Replace(
-			"\"entry\":",
-			"\"distribution\": { \"thunderstore\": { \"team\": \"Author\" } }, \"entry\":"));
+			"\"gameId\": \"com.game.test\",",
+			"\"gameId\": \"com.game.test\", \"distribution\": { \"thunderstore\": { \"team\": \"Author\" } },"));
 		Assert.True(ModLinter.Lint(_dir).Success);
 	}
 }
@@ -296,17 +364,15 @@ public class ThunderstorePackerTests : IDisposable
 	private const string Manifest = """
 		{
 		  "schemaVersion": 1,
-		  "uid": "com.author.modname",
 		  "name": "示例",
 		  "version": "1.2.3",
 		  "description": "demo 模组",
 		  "gameId": "com.game.test",
-		  "loaderVersion": "^1.0.0",
-		  "entry": { "assembly": "Mod.dll", "modules": [ { "uid": "com.author.modname.main", "type": "A.B.M" } ] }
+		  "mods": [ { "uid": "com.author.modname", "assemblies": ["Mod.dll"] } ]
 		}
 		""";
 
-	private void WriteMod() 
+	private void WriteMod()
 	{
 		File.WriteAllText(Path.Combine(_dir, "com.author.modname.mod.json"), Manifest);
 		File.WriteAllText(Path.Combine(_dir, "Mod.dll"), "fake");
@@ -398,15 +464,15 @@ public class ThunderstorePackerTests : IDisposable
 	{
 		WriteMod();
 		File.WriteAllText(Path.Combine(_dir, "com.author.modname.mod.json"), Manifest.Replace(
-			"\"type\": \"A.B.M\" }",
-			"\"type\": \"A.B.M\", \"depends\": [ { \"uid\": \"com.other.lib.main\" } ] }"));
+			"\"assemblies\": [\"Mod.dll\"] }",
+			"\"assemblies\": [\"Mod.dll\"], \"depends\": [ { \"uid\": \"com.other.lib\" } ] }"));
 		var dependencyDir = Path.Combine(_dir, "deps", "com.other.lib");
 		Directory.CreateDirectory(dependencyDir);
 		File.WriteAllText(Path.Combine(dependencyDir, "com.other.lib.mod.json"), """
-			{ "schemaVersion": 1, "uid": "com.other.lib", "name": "lib", "version": "2.1.0",
-			  "gameId": "com.game.test", "loaderVersion": "*",
+			{ "schemaVersion": 1, "version": "2.1.0",
+			  "gameId": "com.game.test",
 			  "distribution": { "thunderstore": { "team": "TeamB" } },
-			  "entry": { "assembly": "Lib.dll", "modules": [ { "uid": "com.other.lib.main", "type": "L.M" } ] } }
+			  "mods": [ { "uid": "com.other.lib", "assemblies": ["Lib.dll"] } ] }
 			""");
 		var zip = Path.Combine(_dir, "out.zip");
 

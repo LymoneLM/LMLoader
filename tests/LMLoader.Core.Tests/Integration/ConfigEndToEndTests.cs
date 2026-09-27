@@ -1,11 +1,11 @@
-using LMLoader.Core;
+﻿using LMLoader.Core;
 using LMLoader.Core.Tests.TestInfrastructure;
 
 namespace LMLoader.Core.Tests.Integration;
 
 /// <summary>
 /// 端到端:真实模组 OnPreLoad 绑定配置 → ConfigManager 合并磁盘 toml →
-/// OnLoad 读到生效值;缺失键写回默认;同模组多模块共享一份配置文件。
+/// OnLoad 读到生效值;缺失键写回默认;配置按模组 uid 一模组一份(D18)。
 /// </summary>
 public class ConfigEndToEndTests : IDisposable
 {
@@ -21,22 +21,21 @@ public class ConfigEndToEndTests : IDisposable
 	private const string ManifestTemplate = """
 		{
 		  "schemaVersion": 1,
-		  "uid": "#UID#",
-		  "name": "#UID#",
-		  "version": "1.0.0",
 		  "gameId": "com.game.test",
-		  "loaderVersion": "1.0.0",
-		  "entry": { "assembly": "#ASM#.dll", "modules": #MODULES# }
+		  "version": "1.0.0",
+		  "mods": #MODS#
 		}
 		""";
 
-	private const string ModulesSource = """
+	/// <summary>按模组 uid 生成带特性绑定的配置声明类(每个模组一份独立 dll)。</summary>
+	private static string MainModSource(string uid) => $$"""
 		using LMLoader.Api;
 		using LMLoader.Api.Config;
 
 		namespace Fixture;
 
-		public class CfgMain : LmModule
+		[LmMod("{{uid}}")]
+		public class CfgMain : LmMod
 		{
 		    public static System.Collections.Generic.List<string> Calls => CallRecorder.Items;
 
@@ -56,8 +55,16 @@ public class ConfigEndToEndTests : IDisposable
 		        Calls.Add("greeting=" + _greeting.Value);
 		    }
 		}
+		""";
 
-		public class CfgSecond : LmModule
+	private static string SecondModSource(string uid) => $$"""
+		using LMLoader.Api;
+		using LMLoader.Api.Config;
+
+		namespace Fixture;
+
+		[LmMod("{{uid}}")]
+		public class CfgSecond : LmMod
 		{
 		    public static System.Collections.Generic.List<string> Calls => CallRecorder.Items;
 
@@ -96,8 +103,7 @@ public class ConfigEndToEndTests : IDisposable
 	[Fact]
 	public void 端到端_文件值OnLoad生效_缺失键写回默认()
 	{
-		CreateMod("com.e.cfg", "CfgMainAsm",
-			"""[{ "uid": "com.e.cfg.main", "type": "Fixture.CfgMain", "depends": [] }]""");
+		CreateMod("com.e.cfg", "CfgMainAsm", MainModSource("com.e.cfg"));
 
 		// 预置用户配置:multiplier 已设;greeting 缺失(应补默认写回)
 		Directory.CreateDirectory(ConfigRoot);
@@ -131,10 +137,23 @@ public class ConfigEndToEndTests : IDisposable
 
 	[Trait("Category", "UsesFileSystem")]
 	[Fact]
-	public void 端到端_同模组多模块共享配置文件()
+	public void 端到端_同清单多模组_配置按模组各自独立_D18()
 	{
-		CreateMod("com.e.cfg2", "CfgBothAsm",
-			"""[{ "uid": "com.e.cfg2.m1", "type": "Fixture.CfgMain", "depends": [] }, { "uid": "com.e.cfg2.m2", "type": "Fixture.CfgSecond", "depends": [] }]""");
+		var modDir = Path.Combine(ModsRoot, "com.e.pack");
+		Directory.CreateDirectory(modDir);
+		var recorderDll = TestCompiler.CompileToDirectory(modDir, "CallRecorderLib", RecorderSource);
+		TestCompiler.CompileToDirectory(
+			modDir, "CfgMainAsm", MainModSource("com.e.pack.main"), recorderDll, typeof(LMLoader.Api.LmMod).Assembly.Location);
+		TestCompiler.CompileToDirectory(
+			modDir, "CfgSecondAsm", SecondModSource("com.e.pack.extra"), recorderDll, typeof(LMLoader.Api.LmMod).Assembly.Location);
+		var manifestPath = Path.Combine(modDir, "com.e.pack.mod.json");
+		File.WriteAllText(manifestPath, ManifestTemplate
+			.Replace("#MODS#", """
+				[
+				    { "uid": "com.e.pack.main", "assemblies": ["CfgMainAsm.dll"] },
+				    { "uid": "com.e.pack.extra", "assemblies": ["CfgSecondAsm.dll"] }
+				  ]
+				"""));
 
 		using var manager = new ModManager(new LoaderOptions
 		{
@@ -148,31 +167,29 @@ public class ConfigEndToEndTests : IDisposable
 
 		Assert.NotNull(result.Lifecycle);
 		Assert.Equal(2, result.Lifecycle!.SucceededCount);
-		var anyInstance = result.Lifecycle.Results.Select(r => r.Instance).First(i => i is not null)!;
-		var calls = (List<string>)anyInstance.GetType().GetProperty("Calls")!.GetValue(null)!;
-		Assert.Contains("multiplier=3", calls);
-		Assert.Contains("enabled=True", calls);
 
-		// 一份文件同时承载两个模块的声明
-		var disk = new TomlConfigStoreProbe(ConfigRoot).ReadMod("com.e.cfg2");
-		var voice = Assert.IsType<Tomlyn.Model.TomlTable>(disk["voice"]);
-		Assert.Equal("hi", voice["greeting"]);
-		Assert.Equal(true, voice["enabled"]);
+		// 一份清单两个模组:配置文件按模组 uid 各自独立
+		var mainDisk = new TomlConfigStoreProbe(ConfigRoot).ReadMod("com.e.pack.main");
+		var mainVoice = Assert.IsType<Tomlyn.Model.TomlTable>(mainDisk["voice"]);
+		Assert.Equal("hi", mainVoice["greeting"]);
+		Assert.False(mainVoice.ContainsKey("enabled"));
+
+		var extraDisk = new TomlConfigStoreProbe(ConfigRoot).ReadMod("com.e.pack.extra");
+		var extraVoice = Assert.IsType<Tomlyn.Model.TomlTable>(extraDisk["voice"]);
+		Assert.Equal(true, extraVoice["enabled"]);
+		Assert.False(extraVoice.ContainsKey("greeting"));
 	}
 
-	private string CreateMod(string uid, string assemblyName, string modulesJson)
+	private void CreateMod(string uid, string assemblyName, string source)
 	{
 		var modDir = Path.Combine(ModsRoot, uid);
 		Directory.CreateDirectory(modDir);
 		var recorderDll = TestCompiler.CompileToDirectory(modDir, "CallRecorderLib", RecorderSource);
 		TestCompiler.CompileToDirectory(
-			modDir, assemblyName, ModulesSource, recorderDll, typeof(LMLoader.Api.LmModule).Assembly.Location);
+			modDir, assemblyName, source, recorderDll, typeof(LMLoader.Api.LmMod).Assembly.Location);
 		var manifestPath = Path.Combine(modDir, uid + ".mod.json");
 		File.WriteAllText(manifestPath, ManifestTemplate
-			.Replace("#UID#", uid)
-			.Replace("#ASM#", assemblyName)
-			.Replace("#MODULES#", modulesJson));
-		return modDir;
+			.Replace("#MODS#", $$"""[ { "uid": "{{uid}}", "assemblies": ["{{assemblyName}}.dll"] } ]"""));
 	}
 
 	/// <summary>探针:直接用默认存储读文件,避免依赖被测 manager 实例。</summary>

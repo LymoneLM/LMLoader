@@ -117,16 +117,16 @@ internal static class Args
 			? output
 			: Path.Combine(dir, Path.GetFileName(dir.TrimEnd(Path.DirectorySeparatorChar)) + "-thunderstore.zip");
 
-		// 依赖别名来源:--deps-root 下递归读全部 mod.json
+		// 依赖别名来源:--deps-root 下递归读全部 mod.json(按模组 uid → 所属清单映射)
 		Dictionary<string, ModManifest>? dependencies = null;
 		if (options.TryGetValue("deps-root", out var depsRoot) && Directory.Exists(depsRoot))
 		{
 			dependencies = Directory.EnumerateFiles(depsRoot, "*mod.json", SearchOption.AllDirectories)
 				.Select(ModManifestReader.ReadFile)
 				.Where(r => r.Success)
-				.Select(r => r.Manifest!)
-				.GroupBy(m => m.Uid)
-				.ToDictionary(g => g.Key, g => g.First());
+				.SelectMany(r => r.Manifest!.Mods.Select(m => (Uid: m.Uid, Manifest: r.Manifest!)))
+				.GroupBy(x => x.Uid, StringComparer.Ordinal)
+				.ToDictionary(g => g.Key, g => g.First().Manifest, StringComparer.Ordinal);
 		}
 
 		var result = ThunderstorePacker.Pack(dir, Require(options, "team"), zip, dependencies, Console.Out.WriteLine);

@@ -1,4 +1,4 @@
-using LMLoader.Core.Manifest;
+﻿using LMLoader.Core.Manifest;
 using LMLoader.Core.Versioning;
 using LMLoader.Distribution.Thunderstore;
 
@@ -80,13 +80,8 @@ public class ThunderstoreRulesTests
 	private static ModManifest MakeManifest(string uid, ModDistribution? distribution) => new()
 	{
 		SchemaVersion = 1,
-		Uid = uid,
-		Name = uid,
-		Version = SemVer.Parse("1.0.0"),
 		GameId = "com.game.test",
-		LoaderVersion = VersionRange.Parse("*"),
-		EntryAssembly = "Mod.dll",
-		Modules = [new ModuleEntry { Uid = uid + ".main", Type = "T.M" }],
+		Mods = [new ModEntry { Uid = uid, Version = SemVer.Parse("1.0.0"), Name = uid }],
 		SourcePath = $"{uid}.mod.json",
 		Distribution = distribution,
 	};
@@ -170,16 +165,17 @@ public class ThunderstoreAdapterTests
 		ModDistribution? distribution = null,
 		string? website = null,
 		string? description = null,
-		(string ModuleUid, string? Range, string? Exact, bool Soft)[]? depends = null)
+		(string TargetUid, string? Range, string? Exact, bool Soft)[]? depends = null)
 	{
-		var modules = new[]
+		var mods = new List<ModEntry>
 		{
-			new ModuleEntry
+			new()
 			{
-				Uid = uid + ".main",
-				Type = "T.M",
-				Depends = (depends ?? []).Select(d => new ModuleDependency(
-					d.ModuleUid,
+				Uid = uid,
+				Version = SemVer.Parse(version),
+				Name = uid,
+				Depends = (depends ?? []).Select(d => new ModDependency(
+					d.TargetUid,
 					d.Exact is null ? null : SemVer.Parse(d.Exact),
 					d.Soft)
 				{
@@ -190,13 +186,8 @@ public class ThunderstoreAdapterTests
 		return new ModManifest
 		{
 			SchemaVersion = 1,
-			Uid = uid,
-			Name = uid,
-			Version = SemVer.Parse(version),
 			GameId = "com.game.test",
-			LoaderVersion = VersionRange.Parse("*"),
-			EntryAssembly = "Mod.dll",
-			Modules = modules,
+			Mods = mods,
 			SourcePath = $"{uid}.mod.json",
 			Distribution = distribution,
 			Website = website,
@@ -245,7 +236,7 @@ public class ThunderstoreAdapterTests
 		var dependency = MakeMod("com.other.lib", "2.1.0", new ModDistribution("TeamB"));
 		var manifest = MakeMod("com.author.modname", depends:
 		[
-			("com.other.lib.main", "^2.0.0", null, false),
+			("com.other.lib", "^2.0.0", null, false),
 		]);
 
 		var ts = ThunderstoreAdapter.ToThunderstore(
@@ -256,14 +247,33 @@ public class ThunderstoreAdapterTests
 	}
 
 	[Fact]
-	public void 转换_同模组多模块依赖只生成一条()
+	public void 转换_多模组依赖同一目标只生成一条_D18()
 	{
 		var dependency = MakeMod("com.other.lib", "1.0.0", new ModDistribution("TeamB"));
-		var manifest = MakeMod("com.author.modname", depends:
-		[
-			("com.other.lib.main", null, null, false),
-			("com.other.lib.extra", null, null, true),
-		]);
+		// 清单内两个模组都依赖同一目标:按目标 uid 去重
+		var manifest = new ModManifest
+		{
+			SchemaVersion = 1,
+			GameId = "com.game.test",
+			Mods =
+			[
+				new ModEntry
+				{
+					Uid = "com.author.modname",
+					Version = SemVer.Parse("1.0.0"),
+					Name = "main",
+					Depends = [new ModDependency("com.other.lib", null, Soft: false)],
+				},
+				new ModEntry
+				{
+					Uid = "com.author.modname.extra",
+					Version = SemVer.Parse("1.0.0"),
+					Name = "extra",
+					Depends = [new ModDependency("com.other.lib", null, Soft: true)],
+				},
+			],
+			SourcePath = "com.author.modname.mod.json",
+		};
 
 		var ts = ThunderstoreAdapter.ToThunderstore(
 			manifest, "Author", new Dictionary<string, ModManifest> { ["com.other.lib"] = dependency });
@@ -278,7 +288,7 @@ public class ThunderstoreAdapterTests
 		var dependency = MakeMod("com.other.lib", "1.0.0"); // 无 distribution
 		var manifest = MakeMod("com.author.modname", depends:
 		[
-			("com.other.lib.main", null, null, false),
+			("com.other.lib", null, null, false),
 		]);
 		var warnings = new List<string>();
 
@@ -295,7 +305,7 @@ public class ThunderstoreAdapterTests
 	{
 		var manifest = MakeMod("com.author.modname", depends:
 		[
-			("com.ghost.mod.main", null, null, false),
+			("com.ghost.mod", null, null, false),
 		]);
 		var warnings = new List<string>();
 

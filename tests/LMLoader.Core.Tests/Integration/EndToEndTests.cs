@@ -1,4 +1,4 @@
-using LMLoader.Api;
+﻿using LMLoader.Api;
 using LMLoader.Core.Tests.TestInfrastructure;
 
 namespace LMLoader.Core.Tests.Integration;
@@ -30,12 +30,9 @@ public class EndToEndTests : IDisposable
 	private const string ManifestTemplate = """
 		{
 		  "schemaVersion": 1,
-		  "uid": "#UID#",
-		  "name": "#UID#",
-		  "version": "1.0.0",
 		  "gameId": "com.game.test",
-		  "loaderVersion": "1.0.0",
-		  "entry": { "assembly": "#ASM#.dll", "modules": [ { "uid": "#UID#.main", "type": "Fixture.#CLASS#", "depends": #DEPS# } ] }
+		  "version": "1.0.0",
+		  "mods": [ { "uid": "#UID#", "assemblies": ["#ASM#.dll"], "depends": #DEPS# } ]
 		}
 		""";
 
@@ -84,7 +81,8 @@ public class EndToEndTests : IDisposable
 
 			namespace Fixture;
 
-			public class {{className}} : LmModule
+			[LmMod("{{uid}}")]
+			public class {{className}} : LmMod
 			{
 			    public static System.Collections.Generic.List<string> Calls => CallRecorder.Items;
 
@@ -104,7 +102,7 @@ public class EndToEndTests : IDisposable
 			{{extraSource}}
 			""";
 		var modDll = TestCompiler.CompileToDirectory(
-			dir, className + "Asm", source, new[] { recorderDll, typeof(LmModule).Assembly.Location }.Concat(referencedDlls).ToArray());
+			dir, className + "Asm", source, new[] { recorderDll, typeof(LmMod).Assembly.Location }.Concat(referencedDlls).ToArray());
 
 		// 模组捆绑自己的依赖(真实打包语义);同名库在共享 ALC 下先载入者胜
 		foreach (var referenced in referencedDlls)
@@ -114,7 +112,7 @@ public class EndToEndTests : IDisposable
 
 		var deps = depends is null || depends.Length == 0
 			? "[]"
-			: "[" + string.Join(", ", depends.Select(d => $$"""{ "uid": "{{d.Uid}}.main", "soft": {{(d.Soft ? "true" : "false").ToString().ToLowerInvariant()}}}""")) + "]";
+			: "[" + string.Join(", ", depends.Select(d => $$"""{ "uid": "{{d.Uid}}", "soft": {{(d.Soft ? "true" : "false").ToString().ToLowerInvariant()}}}""")) + "]";
 		var json = ManifestTemplate
 			.Replace("#UID#", uid)
 			.Replace("#ASM#", className + "Asm")
@@ -195,7 +193,8 @@ public class EndToEndTests : IDisposable
 
 			namespace Fixture;
 
-			public class M_com_e_direct : LmModule
+			[LmMod("com.e.direct")]
+			public class M_com_e_direct : LmMod
 			{
 			    public static System.Collections.Generic.List<string> Calls => CallRecorder.Items;
 
@@ -208,7 +207,7 @@ public class EndToEndTests : IDisposable
 			}
 			""";
 		var baseModDll = TestCompiler.CompileToDirectory(
-			baseDir, "BaseDirectAsm", baseSource, recorderDll, typeof(LmModule).Assembly.Location);
+			baseDir, "BaseDirectAsm", baseSource, recorderDll, typeof(LmMod).Assembly.Location);
 		File.WriteAllText(Path.Combine(baseDir, "com.e.direct.mod.json"), ManifestTemplate
 			.Replace("#UID#", "com.e.direct")
 			.Replace("#ASM#", "BaseDirectAsm")
@@ -224,7 +223,8 @@ public class EndToEndTests : IDisposable
 
 			namespace Fixture;
 
-			public class M_com_e_reader : LmModule
+			[LmMod("com.e.reader")]
+			public class M_com_e_reader : LmMod
 			{
 			    public static System.Collections.Generic.List<string> Calls => CallRecorder.Items;
 
@@ -235,12 +235,12 @@ public class EndToEndTests : IDisposable
 			""";
 		TestCompiler.CompileToDirectory(
 			consumerDir, "ReaderAsm", consumerSource,
-			consumerRecorderDll, typeof(LmModule).Assembly.Location, baseModDll);
+			consumerRecorderDll, typeof(LmMod).Assembly.Location, baseModDll);
 		File.WriteAllText(Path.Combine(consumerDir, "com.e.reader.mod.json"), ManifestTemplate
 			.Replace("#UID#", "com.e.reader")
 			.Replace("#ASM#", "ReaderAsm")
 			.Replace("#CLASS#", "M_com_e_reader")
-			.Replace("#DEPS#", """[{ "uid": "com.e.direct.main" }]"""));
+			.Replace("#DEPS#", """[{ "uid": "com.e.direct" }]"""));
 
 		using var manager = new ModManager(new LoaderOptions
 		{

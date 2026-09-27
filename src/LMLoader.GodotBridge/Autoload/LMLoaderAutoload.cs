@@ -190,7 +190,7 @@ public partial class LMLoaderAutoload : Node
 
 		foreach (var modUid in result.Lifecycle.Results
 			.Where(r => r.Succeeded)
-			.Select(r => r.ModUid)
+			.Select(r => r.Uid)
 			.Distinct(StringComparer.Ordinal))
 		{
 			_modsMountRoot.AddChild(new Node { Name = SanitizeNodeName(modUid) });

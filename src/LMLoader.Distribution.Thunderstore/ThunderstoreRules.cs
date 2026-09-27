@@ -25,14 +25,14 @@ public static partial class ThunderstoreRules
 
 	public const int MaxDescriptionLength = 256;
 
-	/// <summary>UID 尾段 → Thunderstore 包名缺省值('.' → '_';尾段本身即不含点)。</summary>
+	/// <summary>uid 尾段 → Thunderstore 包名缺省值('.' → '_';尾段本身即不含点)。</summary>
 	public static string DefaultPackageName(string uid) =>
 		uid.Split('.')[^1].Replace('-', '_');
 
-	/// <summary>从本格式清单取别名包名;未声明时回退缺省规则。</summary>
+	/// <summary>从本格式清单取别名包名;未声明时回退缺省规则(首个模组 uid 尾段,D18)。</summary>
 	public static string ResolvePackageName(ModManifest manifest)
 	{
 		var declared = manifest.Distribution?.ThunderstoreName;
-		return string.IsNullOrEmpty(declared) ? DefaultPackageName(manifest.Uid) : declared!;
+		return string.IsNullOrEmpty(declared) ? DefaultPackageName(manifest.Mods[0].Uid) : declared!;
 	}
 }

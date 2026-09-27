@@ -1,8 +1,8 @@
-# LMLoader
+﻿# LMLoader
 
 **Godot 4 / C# 的类 BepInEx 模组加载器**(LGPL-3.0-or-later)。游戏开发者一行代码接入;模组作者用常规 Godot/C# 习惯做模组。
 
-> 当前状态:内嵌版 v1.0。
+> 当前状态:内嵌版 v1.1。
 
 ## 为什么需要 LMLoader(Godot 原生 addon 差在哪)
 
@@ -13,7 +13,8 @@ Godot 原生的"模组"通常是直接塞进工程的 addon——耦合于具体
 LMLoader 把这些生态层能力补齐:
 
 - **依赖管理**:mod.json 声明依赖与版本区间(`^` `~` `>=`),拓扑排序、循环整批拒绝、
-  版本冲突可诊断;依赖只声明在清单,不做代码双声明。
+  版本冲突可诊断;依赖只声明在清单,不做代码双声明。一个清单可并列声明多个模组,
+  依赖直接引用对方的模组 uid。
 - **统一分发**:同一份模组目录 = 原生格式;Thunderstore 包(带 mod.json)解压即用;
   Steam Workshop 订阅目录自动发现。玩家"订阅即用",作者零适配。
 - **隔离与稳定**:模组装进独立 ALC,loader 供给公共库;单模组失败不杀游戏、
@@ -49,7 +50,8 @@ dotnet add package LMLoader.Api   # 模组工程唯一引用
 ```
 
 ```csharp
-public class MyModule : LmModule   // 清单 entry.modules[].type = 完整命名空间全名
+[LmMod("com.author.mymod")]        // 特性 uid = 清单 mods[].uid(D18 特性绑定)
+public class MyModule : LmMod
 {
     public override void OnLoad()
     {
@@ -59,7 +61,16 @@ public class MyModule : LmModule   // 清单 entry.modules[].type = 完整命名
 }
 ```
 
-`mods/MyMod/` 下放 `com.author.mymod.mod.json` + `MyMod.dll` 即可被自动发现。
+`mods/MyMod/` 下放 `com.author.mymod.mod.json` + `MyMod.dll` 即可被自动发现:
+
+```json
+{
+  "schemaVersion": 1,
+  "version": "1.0.0",
+  "gameId": "com.game.identifier",
+  "mods": [ { "uid": "com.author.mymod", "assemblies": ["MyMod.dll"] } ]
+}
+```
 完整指引:[mod 开发指南](docs/mod-dev-guide.md) · [API 参考](docs/api-reference.md) ·
 [mod.json 规范](docs/mod-json-schema.md) · [配置详解](docs/mod-config.md)。
 
@@ -68,7 +79,7 @@ public class MyModule : LmModule   // 清单 entry.modules[].type = 完整命名
 | 包 | 用途 |
 |---|---|
 | `LMLoader.Embedded` | 游戏宿主接入(传递 Core/GodotBridge/UI) |
-| `LMLoader.Api` | 模组工程唯一引用(小而稳定,随 loaderVersion 语义化) |
+| `LMLoader.Api` | 模组工程唯一引用(小而稳定,随 loaderVersion 语义化;`[LmMod]` 特性在此) |
 | `LMLoader.Core` / `GodotBridge` / `UI` | 分包依赖,宿主可单独消费 |
 | `LMLoader.Cli` | 作者工具:lint / pack-pck / pack-ts(源码随仓库,后续独立发包) |
 
@@ -77,7 +88,7 @@ public class MyModule : LmModule   // 清单 entry.modules[].type = 完整命名
 - `src/` — Api / Core / GodotBridge / Embedded / UI / Distribution(Thunderstore、SteamWorkshop)
 - `tools/LMLoader.Cli` — mod 作者命令行
 - `samples/SampleGame.Embedded` — 可运行样例(单模组深验证 + 双模组协作,headless 冒烟可断言)
-- `tests/` — 306 例单测(含 Roslyn 运行时编译真实模组 dll 的集成夹具)
+- `tests/` — 323 例单测(含 Roslyn 运行时编译真实模组 dll 的集成夹具)
 
 ## 开发
 

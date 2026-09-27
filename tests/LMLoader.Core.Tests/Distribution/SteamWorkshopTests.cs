@@ -1,4 +1,4 @@
-using LMLoader.Core;
+﻿using LMLoader.Core;
 using LMLoader.Distribution.SteamWorkshop;
 
 namespace LMLoader.Core.Tests.Distribution;
@@ -151,12 +151,9 @@ public class SteamWorkshopTests : IDisposable
 		File.WriteAllText(Path.Combine(workshopDir, "com.ws.mod.mod.json"), """
 			{
 			  "schemaVersion": 1,
-			  "uid": "com.ws.mod",
-			  "name": "workshop mod",
-			  "version": "1.0.0",
 			  "gameId": "com.game.test",
-			  "loaderVersion": "1.0.0",
-			  "entry": { "assembly": "Mod.dll", "modules": [ { "uid": "com.ws.mod.main", "type": "A.B.M" } ] }
+			  "version": "1.0.0",
+			  "mods": [ { "uid": "com.ws.mod", "assemblies": ["Mod.dll"] } ]
 			}
 			""");
 
@@ -175,7 +172,7 @@ public class SteamWorkshopTests : IDisposable
 		var result = manager.LoadAll();
 
 		Assert.Single(result.LoadedManifests);
-		Assert.Equal("com.ws.mod", result.LoadedManifests[0].Uid);
+		Assert.Equal("com.ws.mod", result.LoadedManifests[0].Mods[0].Uid);
 	}
 
 	[Fact]
@@ -184,12 +181,9 @@ public class SteamWorkshopTests : IDisposable
 		var manifest = """
 			{
 			  "schemaVersion": 1,
-			  "uid": "com.dup.mod",
-			  "name": "dup",
-			  "version": "1.0.0",
 			  "gameId": "com.game.test",
-			  "loaderVersion": "1.0.0",
-			  "entry": { "assembly": "Mod.dll", "modules": [ { "uid": "com.dup.mod.main", "type": "A.B.M" } ] }
+			  "version": "1.0.0",
+			  "mods": [ { "uid": "com.dup.mod", "assemblies": ["Mod.dll"] } ]
 			}
 			""";
 		var modsRoot = Path.Combine(_root, "mods");
@@ -207,9 +201,11 @@ public class SteamWorkshopTests : IDisposable
 
 		var result = manager.LoadAll();
 
-		var single = Assert.Single(result.LoadedManifests);
-		Assert.EndsWith("mods", single.Directory);
-		Assert.Contains("已从其他扫描根加载", result.SummaryText);
+		// D18:两份清单均通过读取;去重发生在规划期(模组粒度,主根优先)
+		Assert.Equal(2, result.LoadedManifests.Count);
+		var winner = Assert.Single(result.Plan.Ordered);
+		Assert.EndsWith("mods", winner.Manifest.Directory);
+		Assert.Contains(result.Plan.Skipped, s => s.Uid == "com.dup.mod" && s.Reason.Contains("主根优先"));
 	}
 
 	[Fact]

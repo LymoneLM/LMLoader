@@ -1,16 +1,17 @@
-# 模组配置(mod.json 之外的运行时配置)
+﻿# 模组配置(mod.json 之外的运行时配置)
 
 > 面向模组作者;宿主接入见文末。
 
 ## 快速上手
 
-在模块的 `OnPreLoad` 中声明配置项,`OnLoad` 起读到的即为合并后的最终值:
+在模组的 `OnPreLoad` 中声明配置项,`OnLoad` 起读到的即为合并后的最终值:
 
 ```csharp
 using LMLoader.Api;
 using LMLoader.Api.Config;
 
-public class MyModule : LmModule
+[LmMod("com.author.mymod")]     // 特性 uid = 清单 mods[].uid
+public class MyModule : LmMod
 {
     private ConfigEntry<int> _multiplier = null!;
 
@@ -33,13 +34,13 @@ public class MyModule : LmModule
 ```
 
 - 声明时机:**只在 `OnPreLoad` 中 `Bind`**。同键重复 `Bind` 返回同一实例;改类型重绑会抛异常。
-- 同模组的多个模块共享同一份配置(文件以 modUid 命名),节名/键名自冲突。
+- 一模组一份配置(文件以模组 uid 命名);同一清单内的多个模组各自独立一份,节名/键名互不干扰。
 - 支持的类型(v1 标量):`string`、`bool`、各整型、`float`/`double`/`decimal`、`enum`。enum 在文件中写作名字符串。
 - 约束:`AcceptableValueRange<T>`(越界钳制到边界)与 `AcceptableValueList<T>(...)`(列表外回退默认)。约束类型必须与绑定类型一致。
 
 ## 文件位置与格式
 
-- 位置:`user://configs/<modUid>.toml`(Godot 环境由 loader 自动全局化;Steam 等游戏目录只读环境亦可写)。
+- 位置:`user://configs/<模组uid>.toml`(Godot 环境由 loader 自动全局化;Steam 等游戏目录只读环境亦可写)。
 - 首次运行:loader 把全部声明项按默认值写回文件,供用户修改。
 - 手工编辑即改即生效(热重载);无需重启(声明了 `requiresRestart` 的项除外,值仍会更新,但建议提示用户重启)。
 

@@ -7,8 +7,7 @@ public class ModManifestReaderTests
 	private const string FullManifest = """
 		{
 		  "schemaVersion": 1,
-		  "uid": "com.author.modname",
-		  "name": "示例模组",
+		  "name": "示例合集",
 		  "version": "1.2.3",
 		  "authors": ["Author"],
 		  "description": "演示完整字段的清单",
@@ -16,26 +15,22 @@ public class ModManifestReaderTests
 		  "website": "https://example.com/modname",
 		  "gameId": "com.game.identifier",
 		  "loaderVersion": "1.0.0",
-		  "entry": {
-		    "assembly": "Mod.dll",
-		    "modules": [
-		      {
-		        "uid": "com.author.modname.core",
-		        "type": "Author.Modname.CoreModule",
-		        "depends": [
-		          { "uid": "com.other.mod.core", "version": "2.0.0", "soft": false }
-		        ]
-		      },
-		      {
-		        "uid": "com.author.modname.extra",
-		        "type": "Author.Modname.ExtraModule",
-		        "depends": [
-		          { "uid": "com.author.modname.core", "soft": true }
-		        ]
-		      }
-		    ]
-		  },
-		  "resources": { "pck": ["pcks/mod.pck"] }
+		  "mods": [
+		    {
+		      "uid": "com.author.modname.core",
+		      "assemblies": ["Mod.dll"],
+		      "depends": [
+		        { "uid": "com.other.mod.core", "version": "2.0.0", "soft": false }
+		      ]
+		    },
+		    {
+		      "uid": "com.author.modname.extra",
+		      "pck": ["pcks/mod.pck"],
+		      "depends": [
+		        { "uid": "com.author.modname.core", "soft": true }
+		      ]
+		    }
+		  ]
 		}
 		""";
 
@@ -49,21 +44,19 @@ public class ModManifestReaderTests
 
 		Assert.True(result.Success);
 		var manifest = result.Manifest!;
-		Assert.Equal("com.author.modname", manifest.Uid);
-		Assert.Equal("示例模组", manifest.Name);
-		Assert.Equal("1.2.3", manifest.Version.ToString());
-		Assert.Equal(["Author"], manifest.Authors);
 		Assert.Equal("com.game.identifier", manifest.GameId);
-		Assert.Equal("1.0.0", manifest.LoaderVersion.ToString());
-		Assert.Equal("Mod.dll", manifest.EntryAssembly);
-		Assert.Equal(2, manifest.Modules.Count);
-		Assert.Equal("com.author.modname.core", manifest.Modules[0].Uid);
-		Assert.Equal("Author.Modname.CoreModule", manifest.Modules[0].Type);
-		var dependency = Assert.Single(manifest.Modules[0].Depends);
+		Assert.Equal("1.0.0", manifest.LoaderVersion!.ToString());
+		Assert.Equal(["Author"], manifest.Authors);
+		Assert.Equal(2, manifest.Mods.Count);
+		Assert.Equal("com.author.modname.core", manifest.Mods[0].Uid);
+		Assert.Equal("示例合集", manifest.Mods[0].Name); // 继承文件级 name
+		Assert.Equal(["Mod.dll"], manifest.Mods[0].Assemblies);
+		var dependency = Assert.Single(manifest.Mods[0].Depends);
 		Assert.False(dependency.Soft);
 		Assert.Equal("2.0.0", dependency.Version!.Value.ToString());
 		Assert.Equal("test.mod.json", manifest.SourcePath);
-		Assert.True(manifest.PckResources.SequenceEqual(["pcks/mod.pck"]));
+		Assert.True(manifest.Mods[1].PckResources.SequenceEqual(["pcks/mod.pck"]));
+		Assert.Empty(manifest.Mods[1].Assemblies); // 纯资源模组:assemblies 缺省为空
 	}
 
 	[Fact]
@@ -71,7 +64,7 @@ public class ModManifestReaderTests
 	{
 		var result = Read(FullManifest);
 
-		var soft = Assert.Single(result.Manifest!.Modules[1].Depends);
+		var soft = Assert.Single(result.Manifest!.Mods[1].Depends);
 		Assert.True(soft.Soft);
 		Assert.Null(soft.Version);
 	}
@@ -82,21 +75,76 @@ public class ModManifestReaderTests
 		var result = Read("""
 			{
 			  "schemaVersion": 1,
-			  "uid": "com.a.m",
-			  "name": "m",
 			  "version": "0.1.0",
-			  "gameId": "com.game.id",
-			  "loaderVersion": "1.0.0",
-			  "entry": { "assembly": "M.dll", "modules": [ { "uid": "com.a.m.main", "type": "A.M.Main" } ] }
+			  "mods": [ { "uid": "com.a.m", "assemblies": ["M.dll"] } ]
 			}
 			""");
 
 		Assert.True(result.Success);
 		var manifest = result.Manifest!;
+		Assert.Null(manifest.GameId); // D18:gameId 可选 = 通用模组
+		Assert.Null(manifest.LoaderVersion); // 缺省 = 当前 loader 主版本兼容区(宿主侧解析)
 		Assert.Empty(manifest.Authors);
-		Assert.Empty(manifest.PckResources);
-		Assert.Empty(manifest.Modules[0].Depends);
 		Assert.Null(manifest.Description);
+		Assert.Equal("0.1.0", manifest.Mods[0].Version.ToString());
+		Assert.Equal("m", manifest.Mods[0].Name); // 缺省 = uid 尾段
+		Assert.Empty(manifest.Mods[0].Depends);
+	}
+
+	[Fact]
+	public void 文件级字段被模组级覆盖_整项替换()
+	{
+		var result = Read("""
+			{
+			  "schemaVersion": 1,
+			  "version": "1.0.0",
+			  "name": "合集名",
+			  "authors": ["A", "B"],
+			  "tags": ["tool"],
+			  "mods": [
+			    { "uid": "com.a.m", "name": "定制名", "authors": ["C"], "tags": ["content", "ui"] },
+			    { "uid": "com.a.n" }
+			  ]
+			}
+			""");
+
+		Assert.True(result.Success);
+		var overridden = result.Manifest!.Mods[0];
+		Assert.Equal("定制名", overridden.Name);
+		Assert.Equal(["C"], overridden.Authors); // 整项替换,不与文件级合并
+		Assert.Equal(["content", "ui"], overridden.Tags);
+		var inherited = result.Manifest!.Mods[1];
+		Assert.Equal("合集名", inherited.Name); // 未声明时继承文件级 name
+		Assert.Equal(["A", "B"], inherited.Authors);
+		Assert.Equal(["tool"], inherited.Tags);
+	}
+
+	[Fact]
+	public void version两级皆缺_报错()
+	{
+		var result = Read("""
+			{
+			  "schemaVersion": 1,
+			  "mods": [ { "uid": "com.a.m" } ]
+			}
+			""");
+
+		Assert.False(result.Success);
+		Assert.Contains(result.Errors, e => e.Contains("mods[0].version"));
+	}
+
+	[Fact]
+	public void version模组级可单独提供()
+	{
+		var result = Read("""
+			{
+			  "schemaVersion": 1,
+			  "mods": [ { "uid": "com.a.m", "version": "2.3.4" } ]
+			}
+			""");
+
+		Assert.True(result.Success);
+		Assert.Equal("2.3.4", result.Manifest!.Mods[0].Version.ToString());
 	}
 
 	[Fact]
@@ -107,9 +155,8 @@ public class ModManifestReaderTests
 			""");
 
 		Assert.False(result.Success);
-		Assert.Contains(result.Errors, e => e.StartsWith("uid:", StringComparison.Ordinal));
+		Assert.Contains(result.Errors, e => e.StartsWith("mods:", StringComparison.Ordinal));
 		Assert.Contains(result.Errors, e => e.StartsWith("version:", StringComparison.Ordinal));
-		Assert.Contains(result.Errors, e => e.StartsWith("gameId:", StringComparison.Ordinal));
 	}
 
 	[Fact]
@@ -145,19 +192,15 @@ public class ModManifestReaderTests
 		var result = Read("""
 			{
 			  "schemaVersion": 1,
-			  "uid": "com.a.m",
-			  "name": "m",
 			  "version": "0.1.0",
-			  "gameId": "g",
-			  "loaderVersion": "1.0.0",
 			  "futureTopField": { "x": 1 },
-			  "entry": { "assembly": "M.dll", "modules": [ { "uid": "com.a.m.main", "type": "A.M.Main", "futureModField": 7 } ] }
+			  "mods": [ { "uid": "com.a.m", "assemblies": ["M.dll"], "futureModField": 7 } ]
 			}
 			""");
 
 		Assert.True(result.Success);
 		Assert.Contains(result.Warnings, w => w == "futureTopField: 未知字段,已忽略(前向兼容)");
-		Assert.Contains(result.Warnings, w => w.Contains("entry.modules[0].futureModField"));
+		Assert.Contains(result.Warnings, w => w.Contains("mods[0].futureModField"));
 	}
 
 	[Fact]
@@ -167,12 +210,8 @@ public class ModManifestReaderTests
 			{
 			  // 手写清单常见注释
 			  "schemaVersion": 1,
-			  "uid": "com.a.m",
-			  "name": "m",
 			  "version": "0.1.0",
-			  "gameId": "g",
-			  "loaderVersion": "1.0.0",
-			  "entry": { "assembly": "M.dll", "modules": [ { "uid": "com.a.m.main", "type": "A.M.Main", } ], }
+			  "mods": [ { "uid": "com.a.m", "assemblies": ["M.dll"], } ],
 			}
 			""");
 
@@ -185,18 +224,15 @@ public class ModManifestReaderTests
 		var result = Read("""
 			{
 			  "schemaVersion": 1,
-			  "uid": "com.a.m",
 			  "name": "first",
 			  "name": "second",
 			  "version": "0.1.0",
-			  "gameId": "g",
-			  "loaderVersion": "1.0.0",
-			  "entry": { "assembly": "M.dll", "modules": [ { "uid": "com.a.m.main", "type": "A.M.Main" } ] }
+			  "mods": [ { "uid": "com.a.m" } ]
 			}
 			""");
 
 		Assert.True(result.Success);
-		Assert.Equal("second", result.Manifest!.Name);
+		Assert.Equal("second", result.Manifest!.Mods[0].Name); // 文件级继承展开
 		Assert.Contains(result.Warnings, w => w.Contains("name: 字段重复定义"));
 	}
 
@@ -205,22 +241,18 @@ public class ModManifestReaderTests
 	[InlineData("Com Author.mod")]
 	[InlineData(".author.mod")]
 	[InlineData("com..author.mod")]
-	public void uid或模块uid非法_报错(string badUid)
+	public void 模组uid非法_报错(string badUid)
 	{
 		var result = Read($$"""
 			{
 			  "schemaVersion": 1,
-			  "uid": "{{badUid}}",
-			  "name": "m",
 			  "version": "0.1.0",
-			  "gameId": "g",
-			  "loaderVersion": "1.0.0",
-			  "entry": { "assembly": "M.dll", "modules": [ { "uid": "com.a.m.main", "type": "A.M.Main" } ] }
+			  "mods": [ { "uid": "{{badUid}}" } ]
 			}
 			""");
 
 		Assert.False(result.Success);
-		Assert.Contains(result.Errors, e => e.StartsWith("uid:", StringComparison.Ordinal));
+		Assert.Contains(result.Errors, e => e.Contains("不是合法的反向域名结构"));
 	}
 
 	[Fact]
@@ -233,42 +265,16 @@ public class ModManifestReaderTests
 	}
 
 	[Fact]
-	public void 模块type无命名空间_报错()
+	public void 模组uid清单内重复_报错()
 	{
 		var result = Read("""
 			{
 			  "schemaVersion": 1,
-			  "uid": "com.a.m",
-			  "name": "m",
 			  "version": "0.1.0",
-			  "gameId": "g",
-			  "loaderVersion": "1.0.0",
-			  "entry": { "assembly": "M.dll", "modules": [ { "uid": "com.a.m.main", "type": "Main" } ] }
-			}
-			""");
-
-		Assert.False(result.Success);
-		Assert.Contains(result.Errors, e => e.Contains("完整命名空间全名"));
-	}
-
-	[Fact]
-	public void 模块uid清单内重复_报错()
-	{
-		var result = Read("""
-			{
-			  "schemaVersion": 1,
-			  "uid": "com.a.m",
-			  "name": "m",
-			  "version": "0.1.0",
-			  "gameId": "g",
-			  "loaderVersion": "1.0.0",
-			  "entry": {
-			    "assembly": "M.dll",
-			    "modules": [
-			      { "uid": "com.a.m.main", "type": "A.M.Main" },
-			      { "uid": "com.a.m.main", "type": "A.M.Other" }
-			    ]
-			  }
+			  "mods": [
+			    { "uid": "com.a.m", "assemblies": ["M.dll"] },
+			    { "uid": "com.a.m", "assemblies": ["M.dll"] }
+			  ]
 			}
 			""");
 
@@ -276,23 +282,22 @@ public class ModManifestReaderTests
 		Assert.Contains(result.Errors, e => e.Contains("重复定义"));
 	}
 
-	[Fact]
-	public void entryAssembly含路径分隔符_报错()
+	[Theory]
+	[InlineData("libs/M.dll")]
+	[InlineData("M")]
+	[InlineData("M.zip")]
+	public void assemblies非法文件名_报错(string badAssembly)
 	{
-		var result = Read("""
+		var result = Read($$"""
 			{
 			  "schemaVersion": 1,
-			  "uid": "com.a.m",
-			  "name": "m",
 			  "version": "0.1.0",
-			  "gameId": "g",
-			  "loaderVersion": "1.0.0",
-			  "entry": { "assembly": "libs/M.dll", "modules": [ { "uid": "com.a.m.main", "type": "A.M.Main" } ] }
+			  "mods": [ { "uid": "com.a.m", "assemblies": ["{{badAssembly}}"] } ]
 			}
 			""");
 
 		Assert.False(result.Success);
-		Assert.Contains(result.Errors, e => e.Contains("entry.assembly"));
+		Assert.Contains(result.Errors, e => e.Contains(".assemblies["));
 	}
 
 	[Theory]
@@ -307,8 +312,8 @@ public class ModManifestReaderTests
 		var result = Read(json);
 
 		Assert.True(result.Success);
-		Assert.Empty(result.Manifest!.PckResources);
-		Assert.Contains(result.Warnings, w => w.Contains("resources.pck"));
+		Assert.Empty(result.Manifest!.Mods[1].PckResources);
+		Assert.Contains(result.Warnings, w => w.Contains("mods[1].pck"));
 	}
 
 	[Fact]
@@ -317,15 +322,8 @@ public class ModManifestReaderTests
 		var result = Read("""
 			{
 			  "schemaVersion": 1,
-			  "uid": "com.a.m",
-			  "name": "m",
 			  "version": "0.1.0",
-			  "gameId": "g",
-			  "loaderVersion": "1.0.0",
-			  "entry": {
-			    "assembly": "M.dll",
-			    "modules": [ { "uid": "com.a.m.main", "type": "A.M.Main", "depends": [ { "uid": "com.b.m", "soft": "yes" } ] } ]
-			  }
+			  "mods": [ { "uid": "com.a.m", "depends": [ { "uid": "com.b.m", "soft": "yes" } ] } ]
 			}
 			""");
 
@@ -334,22 +332,14 @@ public class ModManifestReaderTests
 	}
 
 	[Fact]
-	public void modules为空数组_报错()
+	public void mods为空数组_报错()
 	{
 		var result = Read("""
-			{
-			  "schemaVersion": 1,
-			  "uid": "com.a.m",
-			  "name": "m",
-			  "version": "0.1.0",
-			  "gameId": "g",
-			  "loaderVersion": "1.0.0",
-			  "entry": { "assembly": "M.dll", "modules": [] }
-			}
+			{ "schemaVersion": 1, "version": "0.1.0", "mods": [] }
 			""");
 
 		Assert.False(result.Success);
-		Assert.Contains(result.Errors, e => e.Contains("至少需要一个模块"));
+		Assert.Contains(result.Errors, e => e.Contains("至少需要一个模组"));
 	}
 
 	[Fact]

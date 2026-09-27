@@ -41,7 +41,7 @@ public sealed class ModManager : IDisposable
 
 		// loader 供给 LMLoader.Api;HarmonyX 由模组自带——若进游戏依赖闭包,
 		// 导出构建的默认上下文会二次解析 MonoMod,类型身份分裂,patch 必失败
-		var shared = new List<Assembly> { typeof(LmModule).Assembly };
+		var shared = new List<Assembly> { typeof(LmMod).Assembly };
 		if (options.SharedLibraries is not null)
 		{
 			shared.AddRange(options.SharedLibraries);
@@ -89,7 +89,6 @@ public sealed class ModManager : IDisposable
 			paths.AddRange(additional.Paths.Except(paths, StringComparer.OrdinalIgnoreCase));
 		}
 
-		var seenUids = new HashSet<string>(StringComparer.Ordinal);
 		foreach (var manifestPath in paths)
 		{
 			var result = ModManifestReader.ReadFile(manifestPath);
@@ -98,44 +97,39 @@ public sealed class ModManager : IDisposable
 			if (!result.Success)
 			{
 				manifestFailures.Add((manifestPath, string.Join("; ", result.Errors)));
-				loaderLogger.Warn($"清单读取失败,模组跳过: {manifestPath}");
+				loaderLogger.Warn($"清单读取失败,整份清单的模组跳过: {manifestPath}");
 				continue;
 			}
 
 			var manifest = result.Manifest!;
 
-			// 附加根可能扫到主根已有模组的副本:主根优先,副本告警跳过
-			if (!seenUids.Add(manifest.Uid))
-			{
-				manifestFailures.Add((manifestPath,
-					$"模组 \"{manifest.Uid}\" 已从其他扫描根加载,本副本忽略(主根优先于附加根)"));
-				continue;
-			}
-
-			// ---- 2. 宿主过滤:gameId(不匹配拒载) ----
+			// ---- 2. 宿主过滤:gameId(清单缺省 = 通用模组;宿主未设 GameId 不比对,D18) ----
 			if (!string.IsNullOrEmpty(_options.GameId) &&
-				!string.Equals(manifest.GameId, _options.GameId, StringComparison.Ordinal))
+				manifest.GameId is { Length: > 0 } gameId &&
+				!string.Equals(gameId, _options.GameId, StringComparison.Ordinal))
 			{
-				manifestFailures.Add((manifestPath, $"gameId 不匹配: 期望 {_options.GameId},实际 {manifest.GameId}"));
+				manifestFailures.Add((manifestPath, $"gameId 不匹配: 期望 {_options.GameId},实际 {gameId}"));
 				continue;
 			}
 
-			// ---- 3. loaderVersion 校验(区间语义;裸精确清单天然兼容) ----
-			var apiVersion = _options.ApiVersion ?? typeof(LmModule).Assembly.GetName().Version!;
+			// ---- 3. loaderVersion 校验(区间语义;缺省 = 当前 API 主版本兼容区,D18) ----
+			var apiVersion = _options.ApiVersion ?? typeof(LmMod).Assembly.GetName().Version!;
 			var apiSemVer = new SemVer(apiVersion.Major, apiVersion.Minor, Math.Max(apiVersion.Build, 0));
-			if (!manifest.LoaderVersion.Contains(apiSemVer))
+			var effectiveLoaderVersion = manifest.LoaderVersion ??
+				VersionRange.Parse(FormattableString.Invariant($"^{apiSemVer.Major}.0.0"));
+			if (!effectiveLoaderVersion.Contains(apiSemVer))
 			{
 				manifestFailures.Add((manifestPath,
-					$"loaderVersion 不满足: 清单要求 {manifest.LoaderVersion},当前加载器 API {apiSemVer}"));
+					$"loaderVersion 不满足: 清单要求 {effectiveLoaderVersion},当前加载器 API {apiSemVer}"));
 				continue;
 			}
 
 			manifests.Add(manifest);
 		}
 
-		loaderLogger.Info($"发现 {manifests.Count} 个有效模组清单(失败 {manifestFailures.Count} 个)");
+		loaderLogger.Info($"发现 {manifests.Count} 份有效模组清单(失败 {manifestFailures.Count} 份)");
 
-		// ---- 4. 依赖规划 ----
+		// ---- 4. 依赖规划(uid 冲突在模组粒度处理:主根优先,同文件重复双拒) ----
 		var plan = DependencyPlanner.Plan(manifests);
 
 		// ---- 5. 生命周期(整批拒绝时跳过;规划后回调供宿主挂载 pck 等资源) ----
@@ -145,6 +139,11 @@ public sealed class ModManager : IDisposable
 			_options.AfterPlan?.Invoke(plan);
 			lifecycle = new LifecycleRunner(_assemblyLoader, LoggerRouter, _options.Strict, Services, _configManager)
 				.Execute(plan);
+		}
+
+		foreach (var warning in lifecycle?.BindingWarnings ?? [])
+		{
+			readWarnings.Add(warning);
 		}
 
 		// ---- 6. 人可读汇总 ----

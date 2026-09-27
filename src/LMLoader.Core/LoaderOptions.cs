@@ -18,7 +18,8 @@ public sealed class LoaderOptions
 	public IEnumerable<string>? AdditionalModsRoots { get; init; }
 
 	/// <summary>
-	/// 宿主游戏标识;非空时与模组 <c>gameId</c> 比对,不匹配拒载。
+	/// 宿主游戏标识;非空时与清单显式声明的 <c>gameId</c> 比对,不匹配拒载整份清单。
+	/// 清单缺省 gameId = 通用模组,装载于任何宿主(D18)。
 	/// </summary>
 	public string GameId { get; init; } = "";
 
@@ -50,7 +51,7 @@ public sealed class LoaderOptions
 	public Api.LmLogLevel MinimumLogLevel { get; init; } = Api.LmLogLevel.Info;
 
 	/// <summary>
-	/// 模组配置根目录:每模组一份 <c>&lt;root&gt;/&lt;modUid&gt;.toml</c>。
+	/// 模组配置根目录:每模组一份 <c>&lt;root&gt;/&lt;模组uid&gt;.toml</c>。
 	/// null/空 = 关闭配置系统。宿主负责给出物理路径(Godot 版传 <c>user://configs</c> 的全局化路径;
 	/// Steam 环境游戏目录不可写,user:// 是硬约束),Core 不感知 user:// 语义。
 	/// </summary>

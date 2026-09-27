@@ -15,11 +15,25 @@
   <ItemGroup>
     <PackageReference Include="HarmonyX" />
     <PackageReference Include="MonoMod.RuntimeDetour" />
-    <ProjectReference Include="..\..\..\src\LMLoader.Api\LMLoader.Api.csproj" />
+    <!-- loader 统一供给 Api(D1):Private=false 不随模组分发 -->
+    <ProjectReference Include="..\..\..\src\LMLoader.Api\LMLoader.Api.csproj">
+      <Private>false</Private>
+    </ProjectReference>
     <!-- patch 目标为游戏程序集:仅编译期引用(不随模组分发,运行期经 GameAssemblyResolver 解析) -->
     <ProjectReference Include="..\..\SampleGame.Embedded\SampleGame.Embedded.csproj">
       <Private>false</Private>
     </ProjectReference>
   </ItemGroup>
+
+  <!-- 传递依赖(GodotSharp/loader 内部库/Tomlyn)会被拷进输出目录;模组只应带本体 dll 与
+       HarmonyX 自带链(D14,deps.json 解析需要)。清单/资源(json/pck/资产)不动。 -->
+  <Target Name="CleanModOutput" AfterTargets="Build">
+    <ItemGroup>
+      <_Keep Include="$(OutputPath)SampleMod.dll;$(OutputPath)SampleMod.pdb;$(OutputPath)0Harmony.dll" />
+      <_Keep Include="$(OutputPath)MonoMod.*.dll;$(OutputPath)Mono.Cecil*.dll" />
+      <_JunkDll Include="$(OutputPath)**\*.dll;$(OutputPath)**\*.pdb" Exclude="@(_Keep)" />
+    </ItemGroup>
+    <Delete Files="@(_JunkDll)" />
+  </Target>
 
 </Project>

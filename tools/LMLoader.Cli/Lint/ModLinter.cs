@@ -14,9 +14,10 @@ public sealed record LintIssue(bool IsError, string Message);
 public sealed record LintResult(bool Success, IReadOnlyList<LintIssue> Issues);
 
 /// <summary>
-/// mod.json 作者侧严格校验。与运行时 reader 的宽容语义互补:
+/// mod.json 作者侧严格校验(D18)。与运行时 reader 的宽容语义互补:
 /// 运行时"忽略并继续"的行为在此一律升级为 error(作者必须在发布前修正),
-/// 另加磁盘一致性检查(入口程序集/图标/pck 文件存在)与 Thunderstore 别名预校验。
+/// 另加磁盘一致性检查(assemblies/pck/icon 文件存在)、清单 uid ↔ 代码 [LmMod] 特性
+/// 交叉校验(元数据读取,不加载程序集)与 Thunderstore 别名预校验。
 /// </summary>
 public static partial class ModLinter
 {
@@ -26,10 +27,11 @@ public static partial class ModLinter
 	/// <summary>严格字段白名单(= 运行时已知字段;额外含 distribution 树)。</summary>
 	private static readonly Dictionary<string, string[]> StrictFields = new()
 	{
-		[""] = ["schemaVersion", "uid", "name", "version", "authors", "description", "icon", "website",
-			"tags", "gameId", "loaderVersion", "entry", "resources", "distribution"],
-		["entry"] = ["assembly", "modules"],
-		["resources"] = ["pck"],
+		[""] = ["schemaVersion", "mods", "gameId", "loaderVersion", "version", "name", "authors",
+			"description", "icon", "website", "tags", "distribution"],
+		["mods[]"] = ["uid", "assemblies", "pck", "depends", "version", "name", "authors",
+			"description", "icon", "website", "tags"],
+		["mods[].depends[]"] = ["uid", "version", "soft"],
 		["distribution"] = ["thunderstore"],
 		["distribution.thunderstore"] = ["team", "name"],
 	};
@@ -74,27 +76,41 @@ public static partial class ModLinter
 		var json = JsonDocument.Parse(File.ReadAllText(manifestPath)).RootElement;
 		CheckUnknownFields(json, "", issues);
 
-		// ---- 4. 磁盘一致性 ----
-		var assemblyPath = Path.Combine(dir, manifest.EntryAssembly);
-		if (!File.Exists(assemblyPath))
+		// ---- 4. gameId 缺省提示(合法,但须是作者的显式选择,D18) ----
+		if (string.IsNullOrEmpty(manifest.GameId))
 		{
-			issues.Add(new LintIssue(true, $"entry.assembly 文件不存在: {manifest.EntryAssembly}(先构建模组工程)"));
+			issues.Add(new LintIssue(false,
+				"未声明 gameId:该清单将装载于任何设置了本 loader 的宿主游戏(通用模组);如仅面向特定游戏请显式声明"));
 		}
 
-		foreach (var pck in manifest.PckResources)
+		// ---- 5. 磁盘一致性(per-mod assemblies/pck + 各级 icon) ----
+		foreach (var mod in manifest.Mods)
 		{
-			var pckPath = Path.Combine(dir, pck);
-			if (!File.Exists(pckPath))
+			foreach (var assembly in mod.Assemblies)
 			{
-				issues.Add(new LintIssue(true, $"resources.pck 文件不存在: {pck}(用 godot --export-pack 导出后随包分发)"));
+				if (!File.Exists(Path.Combine(dir, assembly)))
+				{
+					issues.Add(new LintIssue(true,
+						$"模组 \"{mod.Uid}\" 的 assemblies 文件不存在: {assembly}(先构建模组工程)"));
+				}
 			}
-			else if (!pck.EndsWith(".pck", StringComparison.OrdinalIgnoreCase))
+
+			foreach (var pck in mod.PckResources)
 			{
-				issues.Add(new LintIssue(false, $"resources.pck: \"{pck}\" 扩展名非 .pck"));
+				if (!File.Exists(Path.Combine(dir, pck)))
+				{
+					issues.Add(new LintIssue(true,
+						$"模组 \"{mod.Uid}\" 的 pck 文件不存在: {pck}(用 lmcli pack-pck / godot --export-pack 导出后随包分发)"));
+				}
+				else if (!pck.EndsWith(".pck", StringComparison.OrdinalIgnoreCase))
+				{
+					issues.Add(new LintIssue(false, $"模组 \"{mod.Uid}\" 的 pck: \"{pck}\" 扩展名非 .pck"));
+				}
 			}
 		}
 
-		if (manifest.Icon is { } icon)
+		foreach (var icon in new[] { manifest.Icon }.Concat(manifest.Mods.Select(m => m.Icon))
+			.Where(i => i is not null).Select(i => i!))
 		{
 			if (!File.Exists(Path.Combine(dir, icon)))
 			{
@@ -106,7 +122,10 @@ public static partial class ModLinter
 			}
 		}
 
-		// ---- 5. Thunderstore 别名预校验(打包前早失败) ----
+		// ---- 6. 清单 uid ↔ 代码 [LmMod] 特性交叉校验(元数据读取,不加载程序集,D18) ----
+		CheckAttributeBinding(dir, manifest, issues);
+
+		// ---- 7. Thunderstore 别名预校验(打包前早失败) ----
 		if (manifest.Distribution is { } distribution)
 		{
 			if (distribution.ThunderstoreTeam is { } team && !TeamName().IsMatch(team))
@@ -121,7 +140,7 @@ public static partial class ModLinter
 			}
 		}
 
-		// ---- 6. 发布质量提示(不失败) ----
+		// ---- 8. 发布质量提示(不失败) ----
 		if (string.IsNullOrEmpty(manifest.Description))
 		{
 			issues.Add(new LintIssue(false, "缺少 description(分发平台展示与 README 生成来源)"));
@@ -137,6 +156,74 @@ public static partial class ModLinter
 		LintResult Fail(string message) => new(false, [new LintIssue(true, message)]);
 	}
 
+	/// <summary>
+	/// 扫描各模组声明的 assemblies,将代码侧 [LmMod(uid)] 与清单 mods[].uid 比对:
+	/// 声明有代码却无对应类 → error;特性 uid 未声明 → warning;同 uid 多类型 → error(绑定歧义)。
+	/// </summary>
+	private static void CheckAttributeBinding(string dir, ModManifest manifest, List<LintIssue> issues)
+	{
+		var declaredUids = manifest.Mods.Select(m => m.Uid).ToHashSet(StringComparer.Ordinal);
+		var uidSources = new Dictionary<string, List<string>>(StringComparer.Ordinal);
+
+		foreach (var mod in manifest.Mods.Where(m => m.Assemblies.Count > 0))
+		{
+			foreach (var assembly in mod.Assemblies)
+			{
+				var path = Path.Combine(dir, assembly);
+				if (!File.Exists(path))
+				{
+					continue; // 缺文件已在上一步报错,此处不重复
+				}
+
+				IReadOnlyList<string> uids;
+				try
+				{
+					uids = LmModAttributeScanner.ScanUids(path);
+				}
+				catch (Exception ex) when (ex is BadImageFormatException or IOException)
+				{
+					issues.Add(new LintIssue(true, $"无法读取程序集元数据: {assembly}({ex.Message})"));
+					continue;
+				}
+
+				foreach (var uid in uids)
+				{
+					if (!uidSources.TryGetValue(uid, out var sources))
+					{
+						uidSources[uid] = sources = new List<string>();
+					}
+
+					sources.Add($"{assembly}: {uid}");
+				}
+			}
+		}
+
+		foreach (var mod in manifest.Mods.Where(m => m.Assemblies.Count > 0))
+		{
+			if (!uidSources.ContainsKey(mod.Uid))
+			{
+				issues.Add(new LintIssue(true,
+					$"模组 \"{mod.Uid}\" 声明了 assemblies 但其程序集中没有标注 [LmMod(\"{mod.Uid}\")] 的类型" +
+					"(确认类已标注 LMLoader.Api.LmModAttribute 且为 public 非 abstract)"));
+			}
+		}
+
+		foreach (var (uid, sources) in uidSources)
+		{
+			if (!declaredUids.Contains(uid))
+			{
+				issues.Add(new LintIssue(false,
+					$"程序集中存在未声明的 [LmMod(\"{uid}\")]({string.Join("; ", sources.Distinct())})——" +
+					$"运行时将告警并忽略;请在 mods[] 中声明该 uid 或移除特性"));
+			}
+			else if (sources.Count > 1)
+			{
+				issues.Add(new LintIssue(true,
+					$"uid \"{uid}\" 被多个 [LmMod] 特性声明,运行时绑定歧义: {string.Join("; ", sources.Distinct())}"));
+			}
+		}
+	}
+
 	private static void CheckUnknownFields(JsonElement element, string path, List<LintIssue> issues)
 	{
 		if (element.ValueKind != JsonValueKind.Object)
@@ -145,11 +232,11 @@ public static partial class ModLinter
 		}
 
 		var known = StrictFields.GetValueOrDefault(path,
-			// 依赖数组嵌在 modules[] 内:先判 depends[] 再判 modules[](路径同时包含两者)
+			// 依赖数组嵌在 mods[] 内:先判 depends[] 再判 mods[](路径同时包含两者)
 			path.Contains(".depends[", StringComparison.Ordinal)
-				? ["uid", "version", "soft"]
-				: path.Contains(".modules[", StringComparison.Ordinal)
-					? ["uid", "type", "depends"]
+				? StrictFields["mods[].depends[]"]
+				: path.Contains(".mods[", StringComparison.Ordinal)
+					? StrictFields["mods[]"]
 					: Array.Empty<string>());
 
 		foreach (var property in element.EnumerateObject())
@@ -157,12 +244,12 @@ public static partial class ModLinter
 			var childPath = path.Length == 0 ? property.Name : $"{path}.{property.Name}";
 			if (!known.Contains(property.Name, StringComparer.Ordinal))
 			{
-				issues.Add(new LintIssue(true, $"未知字段: {childPath}(schema v1.0 不含该字段)"));
+				issues.Add(new LintIssue(true, $"未知字段: {childPath}(当前 schema 不含该字段)"));
 				continue;
 			}
 
 			// 数组元素路径替换为 [i] 语义上等价的集合名,逐元素下钻
-			if (property.Name is "modules" or "depends" && property.Value.ValueKind == JsonValueKind.Array)
+			if (property.Name is "mods" or "depends" && property.Value.ValueKind == JsonValueKind.Array)
 			{
 				var prefix = path.Length == 0 ? "" : path + ".";
 				var itemPath = $"{prefix}{property.Name}[]";

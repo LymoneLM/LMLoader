@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: LGPL-3.0-or-later
+﻿// SPDX-License-Identifier: LGPL-3.0-or-later
 
 using LMLoader.Api;
 using LMLoader.Api.Config;
@@ -6,12 +6,13 @@ using LMLoader.Api.Config;
 namespace SampleB;
 
 /// <summary>
-/// 样例模块 B:硬依赖 com.lmloader.sample.main(验证依赖排序),
+/// 样例模块 B:硬依赖 com.lmloader.sample(验证依赖排序),
 /// OnPostLoad 经强类型直引通道消费 base 的 IClockService,
 /// 独立配置文件 com.lmloader.sample.extra.toml(per-mod 配置)。
 /// 消费结果记录到静态属性供冒烟断言。
 /// </summary>
-public class SampleModuleB : LmModule
+[LMLoader.Api.LmMod("com.lmloader.sample.extra")]
+public class SampleModuleB : LmMod
 {
 	/// <summary>冒烟断言用:OnPostLoad 消费服务的结果记录。</summary>
 	public static System.Collections.Generic.List<string> Records { get; } = new();

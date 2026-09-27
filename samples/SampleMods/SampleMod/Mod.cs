@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: LGPL-3.0-or-later
+﻿// SPDX-License-Identifier: LGPL-3.0-or-later
 
 using System.Reflection;
 using HarmonyLib;
@@ -11,7 +11,8 @@ namespace Sample;
 /// 样例模块:演示 OnPreLoad 声明配置、OnLoad 发布跨模组服务、日志、
 /// OnPostLoad 消费时机,以及配置值驱动的 patch(热重载改值即改行为)。
 /// </summary>
-public class SampleModule : LmModule
+[LMLoader.Api.LmMod("com.lmloader.sample")]
+public class SampleModule : LmMod
 {
 	/// <summary>样例服务接口:其他模组可经 ServiceRegistry 消费。</summary>
 	public interface IClockService

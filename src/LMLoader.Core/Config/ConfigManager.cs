@@ -9,8 +9,8 @@ using Tomlyn.Model;
 namespace LMLoader.Core.Config;
 
 /// <summary>
-/// 模组配置协调器:按 modUid 汇集声明面(同模组多模块共享一份),
-/// PreLoad 后读入 <c>&lt;root&gt;/&lt;modUid&gt;.toml</c> 合并——缺失键补默认并写回、孤儿键保留、
+/// 模组配置协调器:按模组 uid 汇集声明面(键 = mods[].uid),
+/// PreLoad 后读入 <c>&lt;root&gt;/&lt;模组uid&gt;.toml</c> 合并——缺失键补默认并写回、孤儿键保留、
 /// 类型/取值不符回退默认并警告;配置文件解析失败时整模组跳过(用默认值且不写回,保护用户原稿)。
 /// </summary>
 public sealed class ConfigManager : IDisposable

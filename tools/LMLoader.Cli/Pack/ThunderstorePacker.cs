@@ -101,7 +101,7 @@ public static class ThunderstorePacker
 		// 3. 无 README.md 时用 description 生成(平台展示页)
 		if (!added.Contains("README.md") && !string.IsNullOrEmpty(manifest.Description))
 		{
-			AddEntry(archive, "README.md", $"# {manifest.Name}\n\n{manifest.Description}\n");
+			AddEntry(archive, "README.md", $"# {manifest.Mods[0].Name}\n\n{manifest.Description}\n");
 		}
 
 		return new ThunderstorePackResult(fullZip, tsManifest.Name, tsManifest.VersionNumber);

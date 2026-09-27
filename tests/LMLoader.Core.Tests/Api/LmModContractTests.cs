@@ -1,8 +1,9 @@
+using System.Reflection;
 using LMLoader.Api;
 
 namespace LMLoader.Core.Tests.Api;
 
-public class LmModuleContractTests
+public class LmModContractTests
 {
 	private sealed class NullLogger : ILmLogger
 	{
@@ -12,39 +13,49 @@ public class LmModuleContractTests
 			Calls.Add((level, message));
 	}
 
-	private sealed class EmptyModule : LmModule { }
+	[LmMod("com.test.mod")]
+	private sealed class EmptyMod : LmMod { }
 
-	private static LmModuleContext NewContext(ILmLogger? logger = null) =>
-		new("com.test.mod.main", "com.test.mod", @"C:\mods\test", logger ?? new NullLogger());
+	private static LmModContext NewContext(ILmLogger? logger = null) =>
+		new("com.test.mod", @"C:\mods\test", logger ?? new NullLogger());
 
 	[Fact]
 	public void Context_未注入时访问抛出()
 	{
-		var module = new EmptyModule();
-		Assert.Throws<InvalidOperationException>(() => _ = module.Context);
+		var mod = new EmptyMod();
+		Assert.Throws<InvalidOperationException>(() => _ = mod.Context);
 	}
 
 	[Fact]
 	public void Attach_注入后可读Uid与Logger_重复注入抛出()
 	{
-		var module = new EmptyModule();
+		var mod = new EmptyMod();
 		var context = NewContext();
-		module.Attach(context);
+		mod.Attach(context);
 
-		Assert.Equal("com.test.mod.main", module.Uid);
-		Assert.Same(context, module.Context);
-		Assert.Throws<InvalidOperationException>(() => module.Attach(NewContext()));
+		Assert.Equal("com.test.mod", mod.Uid);
+		Assert.Same(context, mod.Context);
+		Assert.Throws<InvalidOperationException>(() => mod.Attach(NewContext()));
 	}
 
 	[Fact]
 	public void 默认生命周期钩子为空操作可直接调用()
 	{
-		var module = new EmptyModule();
-		module.Attach(NewContext());
+		var mod = new EmptyMod();
+		mod.Attach(NewContext());
 
-		module.OnPreLoad();
-		module.OnLoad();
-		module.OnPostLoad();
+		mod.OnPreLoad();
+		mod.OnLoad();
+		mod.OnPostLoad();
+	}
+
+	[Fact]
+	public void 特性uid可反射读取()
+	{
+		var attribute = typeof(EmptyMod).GetCustomAttribute<LmModAttribute>(inherit: false);
+
+		Assert.NotNull(attribute);
+		Assert.Equal("com.test.mod", attribute!.Uid);
 	}
 
 	[Fact]

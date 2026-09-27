@@ -6,8 +6,10 @@ using LMLoader.Core.Versioning;
 namespace LMLoader.Core.Manifest;
 
 /// <summary>
-/// mod.json 读取器(schema v1.0)。
+/// mod.json 读取器(schema v1,D18:文件级声明 + 并列模组列表)。
 /// 容错语义:未知字段忽略+警告;schemaVersion 主版本不识别拒载;错误累积返回(不抛出)。
+/// 继承在此展开:每个 <see cref="ModEntry"/> 携带解析后的最终值
+/// (模组级声明覆盖文件级,整项替换;version 两级皆缺为错误)。
 /// </summary>
 public static class ModManifestReader
 {
@@ -63,10 +65,10 @@ public static class ModManifestReader
 				return ManifestReadResult.Fail(errors, warnings);
 			}
 
-			var properties = CollectUniqueProperties(root, "", warnings);
+			var file = CollectUniqueProperties(root, "", warnings);
 
 			// schemaVersion:主版本不识别 → 拒载
-			if (!TryGetRequiredInt(properties, "schemaVersion", errors, out var schemaVersion))
+			if (!TryGetRequiredInt(file, "schemaVersion", errors, out var schemaVersion))
 			{
 				return ManifestReadResult.Fail(errors, warnings);
 			}
@@ -79,90 +81,42 @@ public static class ModManifestReader
 				return ManifestReadResult.Fail(errors, warnings);
 			}
 
-			// 必填标量字段(错误累积,不短路)
-			var okUid = TryGetRequiredString(properties, "uid", errors, out var uid);
-			var okName = TryGetRequiredString(properties, "name", errors, out var name);
-			var okVersion = TryGetRequiredString(properties, "version", errors, out var versionText);
-			var okGameId = TryGetRequiredString(properties, "gameId", errors, out var gameId);
-			var okLoaderVersion = TryGetRequiredString(properties, "loaderVersion", errors, out var loaderVersionText);
-
-			// 可选标量字段
-			var authors = ReadStringArray(properties, "authors", warnings);
-			var description = GetOptionalString(properties, "description");
-			var icon = GetOptionalString(properties, "icon");
-			var website = GetOptionalString(properties, "website");
-			var tags = ReadStringArray(properties, "tags", warnings); // 展示字段
-			var distribution = ReadDistribution(properties, errors, warnings);
-
-			if (okUid && !IsValidUid(uid))
+			// ---- 文件级声明块(全部可选,作为模组继承默认值) ----
+			var fileGameId = GetOptionalString(file, "gameId");
+			VersionRange? loaderVersion = null;
+			if (file.TryGetValue("loaderVersion", out var loaderElement))
 			{
-				errors.Add($"uid: \"{uid}\" 不是合法的反向域名结构(如 com.author.modname)");
-			}
-
-			SemVer version = default;
-			if (okVersion && !SemVer.TryParse(versionText, out version))
-			{
-				errors.Add(FormatVersionError("version", versionText));
-				okVersion = false;
-			}
-
-			VersionRange loaderVersion = default!;
-			if (okLoaderVersion && !VersionRange.TryParse(loaderVersionText, out loaderVersion!))
-			{
-				errors.Add(FormatVersionError("loaderVersion", loaderVersionText));
-				okLoaderVersion = false;
-			}
-
-			if (!(okUid && okName && okVersion && okGameId && okLoaderVersion))
-			{
-				return ManifestReadResult.Fail(errors, warnings);
-			}
-
-			// entry
-			ModuleEntry[] modules = Array.Empty<ModuleEntry>();
-			string entryAssembly = "";
-			if (properties.TryGetValue("entry", out var entryElement))
-			{
-				if (entryElement.ValueKind != JsonValueKind.Object)
+				if (loaderElement.ValueKind == JsonValueKind.String &&
+					VersionRange.TryParse(loaderElement.GetString(), out var parsedLoader))
 				{
-					errors.Add("entry: 必须是对象");
+					loaderVersion = parsedLoader;
 				}
 				else
 				{
-					var entry = CollectUniqueProperties(entryElement, "entry", warnings);
-					if (!TryGetRequiredString(entry, "assembly", errors, out entryAssembly))
-					{
-						entryAssembly = "";
-					}
-					else if (!IsValidAssemblyName(entryAssembly))
-					{
-						errors.Add($"entry.assembly: \"{entryAssembly}\" 必须是相对模组目录的 .dll 文件名,不得包含路径分隔符");
-						entryAssembly = "";
-					}
-
-					if (entry.TryGetValue("modules", out var modulesElement))
-					{
-						modules = ReadModules(modulesElement, errors, warnings);
-					}
-					else
-					{
-						errors.Add("entry.modules: 缺少必填字段");
-					}
+					errors.Add(FormatVersionError("loaderVersion", loaderElement.ValueKind == JsonValueKind.String
+						? loaderElement.GetString() ?? ""
+						: "(非字符串)"));
 				}
 			}
-			else
-			{
-				errors.Add("entry: 缺少必填字段");
-			}
 
-			// resources(可选)
-			var pckResources = ReadResources(properties, warnings);
+			var fileVersion = ReadOptionalSemVer(file, "version", errors);
+			var fileName = GetOptionalString(file, "name");
+			var fileAuthors = ReadStringArray(file, "authors", warnings);
+			var fileDescription = GetOptionalString(file, "description");
+			var fileIcon = GetOptionalString(file, "icon");
+			var fileWebsite = GetOptionalString(file, "website");
+			var fileTags = ReadStringArray(file, "tags", warnings); // 展示字段
+			var distribution = ReadDistribution(file, errors, warnings);
 
-			if (errors.Count > 0 || modules.Length == 0)
+			// ---- 模组列表(唯一必填集合) ----
+			var mods = ReadMods(file, fileName, fileVersion, fileAuthors, fileDescription,
+				fileIcon, fileWebsite, fileTags, errors, warnings);
+
+			if (errors.Count > 0 || mods.Length == 0)
 			{
 				if (errors.Count == 0)
 				{
-					errors.Add("entry.modules: 至少需要一个模块");
+					errors.Add("mods: 至少需要一个模组");
 				}
 
 				return ManifestReadResult.Fail(errors, warnings);
@@ -171,20 +125,15 @@ public static class ModManifestReader
 			var manifest = new ModManifest
 			{
 				SchemaVersion = schemaVersion,
-				Uid = uid,
-				Name = name,
-				Version = version,
-				Authors = authors,
-				Description = description,
-				Icon = icon,
-				Website = website,
-				Tags = tags,
-				Distribution = distribution,
-				GameId = gameId,
+				GameId = fileGameId,
 				LoaderVersion = loaderVersion,
-				EntryAssembly = entryAssembly,
-				Modules = modules,
-				PckResources = pckResources,
+				Authors = fileAuthors,
+				Description = fileDescription,
+				Icon = fileIcon,
+				Website = fileWebsite,
+				Tags = fileTags,
+				Distribution = distribution,
+				Mods = mods,
 				SourcePath = sourcePath,
 				Directory = Path.GetDirectoryName(Path.GetFullPath(sourcePath)) ?? "",
 			};
@@ -193,33 +142,48 @@ public static class ModManifestReader
 		}
 	}
 
-	private static ModuleEntry[] ReadModules(JsonElement modulesElement, List<string> errors, List<string> warnings)
+	private static ModEntry[] ReadMods(
+		Dictionary<string, JsonElement> file,
+		string? fileName,
+		SemVer? fileVersion,
+		string[] fileAuthors,
+		string? fileDescription,
+		string? fileIcon,
+		string? fileWebsite,
+		string[] fileTags,
+		List<string> errors,
+		List<string> warnings)
 	{
-		var result = new List<ModuleEntry>();
-		var seenUids = new HashSet<string>(StringComparer.Ordinal);
-
-		if (modulesElement.ValueKind != JsonValueKind.Array)
+		if (!file.TryGetValue("mods", out var modsElement))
 		{
-			errors.Add("entry.modules: 必须是数组");
-			return Array.Empty<ModuleEntry>();
+			errors.Add("mods: 缺少必填字段");
+			return Array.Empty<ModEntry>();
 		}
 
-		var index = 0;
-		foreach (var moduleElement in modulesElement.EnumerateArray())
+		if (modsElement.ValueKind != JsonValueKind.Array)
 		{
-			var path = $"entry.modules[{index}]";
+			errors.Add("mods: 必须是数组");
+			return Array.Empty<ModEntry>();
+		}
+
+		var result = new List<ModEntry>();
+		var seenUids = new HashSet<string>(StringComparer.Ordinal);
+
+		var index = 0;
+		foreach (var modElement in modsElement.EnumerateArray())
+		{
+			var path = $"mods[{index}]";
 			index++;
 
-			if (moduleElement.ValueKind != JsonValueKind.Object)
+			if (modElement.ValueKind != JsonValueKind.Object)
 			{
 				errors.Add($"{path}: 必须是对象");
 				continue;
 			}
 
-			var properties = CollectUniqueProperties(moduleElement, path, warnings);
+			var mod = CollectUniqueProperties(modElement, path, warnings);
 
-			if (!TryGetRequiredString(properties, "uid", errors, out var uid) ||
-				!TryGetRequiredString(properties, "type", errors, out var type))
+			if (!TryGetRequiredString(mod, "uid", errors, out var uid))
 			{
 				continue;
 			}
@@ -229,47 +193,99 @@ public static class ModManifestReader
 				errors.Add($"{path}.uid: \"{uid}\" 不是合法的反向域名结构");
 			}
 
-			if (!type.Contains('.'))
-			{
-				// 按字符串查类型须用完整命名空间全名,无命名空间类会被漏掉
-				errors.Add($"{path}.type: \"{type}\" 必须为完整命名空间全名(无命名空间的类无法被按名查找)");
-			}
-
 			if (!seenUids.Add(uid))
 			{
-				errors.Add($"{path}.uid: 模块 uid \"{uid}\" 在清单内重复定义");
+				errors.Add($"{path}.uid: 模组 uid \"{uid}\" 在清单内重复定义(双方均放弃加载)");
 			}
 
-			var depends = ReadDependencies(properties, path, errors, warnings);
+			// ---- 继承展开:模组级声明覆盖文件级(整项替换) ----
+			var version = ReadOptionalSemVer(mod, "version", errors, path) ?? fileVersion;
+			if (version is null)
+			{
+				errors.Add($"{path}.version: 缺失(文件级与模组级均未声明,依赖区间判定需要版本锚)");
+			}
 
-			result.Add(new ModuleEntry { Uid = uid, Type = type, Depends = depends });
+			var name = GetOptionalString(mod, "name") ?? fileName ?? DefaultName(uid);
+			var authors = HasField(mod, "authors") ? ReadStringArray(mod, "authors", warnings, path) : fileAuthors;
+			var description = GetOptionalString(mod, "description") ?? fileDescription;
+			var icon = GetOptionalString(mod, "icon") ?? fileIcon;
+			var website = GetOptionalString(mod, "website") ?? fileWebsite;
+			var tags = HasField(mod, "tags") ? ReadStringArray(mod, "tags", warnings, path) : fileTags;
+
+			// ---- assemblies(可选:缺省 = 纯资源/依赖锚模组) ----
+			var assemblies = Array.Empty<string>();
+			if (mod.TryGetValue("assemblies", out var assembliesElement))
+			{
+				if (assembliesElement.ValueKind == JsonValueKind.Array)
+				{
+					var list = new List<string>();
+					var assemblyIndex = 0;
+					foreach (var item in assembliesElement.EnumerateArray())
+					{
+						var itemPath = $"{path}.assemblies[{assemblyIndex}]";
+						assemblyIndex++;
+						if (item.ValueKind != JsonValueKind.String || !IsValidAssemblyName(item.GetString() ?? ""))
+						{
+							errors.Add(
+								$"{itemPath}: 必须是相对模组目录的 .dll 文件名,不得包含路径分隔符");
+							continue;
+						}
+
+						list.Add(item.GetString()!);
+					}
+
+					assemblies = list.ToArray();
+				}
+				else
+				{
+					errors.Add($"{path}.assemblies: 必须是数组");
+				}
+			}
+
+			var depends = ReadDependencies(mod, path, errors, warnings);
+			var pck = ReadPck(mod, path, warnings);
+
+			result.Add(new ModEntry
+			{
+				Uid = uid,
+				Version = version ?? default, // 缺失时已记错误;errors 非空则清单不会返回
+				Name = name,
+				Authors = authors,
+				Description = description,
+				Icon = icon,
+				Website = website,
+				Tags = tags,
+				Assemblies = assemblies,
+				PckResources = pck,
+				Depends = depends,
+			});
 		}
 
 		return result.ToArray();
 	}
 
-	private static ModuleDependency[] ReadDependencies(
-		Dictionary<string, JsonElement> moduleProperties,
-		string modulePath,
+	private static ModDependency[] ReadDependencies(
+		Dictionary<string, JsonElement> modProperties,
+		string modPath,
 		List<string> errors,
 		List<string> warnings)
 	{
-		if (!moduleProperties.TryGetValue("depends", out var dependsElement))
+		if (!modProperties.TryGetValue("depends", out var dependsElement))
 		{
-			return Array.Empty<ModuleDependency>();
+			return Array.Empty<ModDependency>();
 		}
 
 		if (dependsElement.ValueKind != JsonValueKind.Array)
 		{
-			errors.Add($"{modulePath}.depends: 必须是数组");
-			return Array.Empty<ModuleDependency>();
+			errors.Add($"{modPath}.depends: 必须是数组");
+			return Array.Empty<ModDependency>();
 		}
 
-		var result = new List<ModuleDependency>();
+		var result = new List<ModDependency>();
 		var index = 0;
 		foreach (var dependencyElement in dependsElement.EnumerateArray())
 		{
-			var path = $"{modulePath}.depends[{index}]";
+			var path = $"{modPath}.depends[{index}]";
 			index++;
 
 			if (dependencyElement.ValueKind != JsonValueKind.Object)
@@ -330,35 +346,22 @@ public static class ModManifestReader
 				}
 			}
 
-			result.Add(new ModuleDependency(uid, version, soft) { Range = range });
+			result.Add(new ModDependency(uid, version, soft) { Range = range });
 		}
 
 		return result.ToArray();
 	}
 
-	private static string[] ReadResources(Dictionary<string, JsonElement> properties, List<string> warnings)
+	private static string[] ReadPck(Dictionary<string, JsonElement> modProperties, string modPath, List<string> warnings)
 	{
-		if (!properties.TryGetValue("resources", out var resourcesElement))
-		{
-			return Array.Empty<string>();
-		}
-
-		if (resourcesElement.ValueKind != JsonValueKind.Object)
-		{
-			warnings.Add("resources: 应为对象,已忽略");
-			return Array.Empty<string>();
-		}
-
-		var collected = CollectUniqueProperties(resourcesElement, "resources", warnings);
-
-		if (!collected.TryGetValue("pck", out var pckElement))
+		if (!modProperties.TryGetValue("pck", out var pckElement))
 		{
 			return Array.Empty<string>();
 		}
 
 		if (pckElement.ValueKind != JsonValueKind.Array)
 		{
-			warnings.Add("resources.pck: 应为数组,已忽略");
+			warnings.Add($"{modPath}.pck: 应为数组,已忽略");
 			return Array.Empty<string>();
 		}
 
@@ -367,14 +370,14 @@ public static class ModManifestReader
 		{
 			if (pathElement.ValueKind != JsonValueKind.String)
 			{
-				warnings.Add("resources.pck: 含非字符串项,已忽略该项");
+				warnings.Add($"{modPath}.pck: 含非字符串项,已忽略该项");
 				continue;
 			}
 
 			var pckPath = pathElement.GetString() ?? "";
 			if (!IsValidRelativePath(pckPath))
 			{
-				warnings.Add($"resources.pck: \"{pckPath}\" 不是合法的相对路径(禁止绝对路径与 .. 上跳),已忽略该项");
+				warnings.Add($"{modPath}.pck: \"{pckPath}\" 不是合法的相对路径(禁止绝对路径与 .. 上跳),已忽略该项");
 				continue;
 			}
 
@@ -415,19 +418,19 @@ public static class ModManifestReader
 
 	private static readonly string[] KnownTopLevelFields =
 	[
-		"schemaVersion", "uid", "name", "version", "authors", "description",
-		"icon", "website", "tags", "gameId", "loaderVersion", "entry", "resources", "distribution",
+		"schemaVersion", "mods", "gameId", "loaderVersion", "version", "name", "authors",
+		"description", "icon", "website", "tags", "distribution",
 	];
 
 	private static string[] KnownNestedFields(string path) =>
 		path.Contains(".depends[", StringComparison.Ordinal)
 			? ["uid", "version", "soft"]
-			: path.StartsWith("entry.modules[", StringComparison.Ordinal)
-				? ["uid", "type", "depends"]
+			: path.StartsWith("mods[", StringComparison.Ordinal)
+				? ["uid", "assemblies", "pck", "depends", "version", "name", "authors",
+					"description", "icon", "website", "tags"]
 				: path switch
 				{
-					"entry" => ["assembly", "modules"],
-					"resources" => ["pck"],
+					"distribution" => ["thunderstore"],
 					_ => Array.Empty<string>(),
 				};
 
@@ -470,7 +473,8 @@ public static class ModManifestReader
 	private static string[] ReadStringArray(
 		Dictionary<string, JsonElement> properties,
 		string field,
-		List<string> warnings)
+		List<string> warnings,
+		string? path = null)
 	{
 		if (!properties.TryGetValue(field, out var element))
 		{
@@ -479,7 +483,7 @@ public static class ModManifestReader
 
 		if (element.ValueKind != JsonValueKind.Array)
 		{
-			warnings.Add($"{field}: 应为数组,已忽略");
+			warnings.Add($"{PathLabel(path ?? "", field)}: 应为数组,已忽略");
 			return Array.Empty<string>();
 		}
 
@@ -492,11 +496,30 @@ public static class ModManifestReader
 			}
 			else
 			{
-				warnings.Add($"{field}: 含空或非字符串项,已忽略该项");
+				warnings.Add($"{PathLabel(path ?? "", field)}: 含空或非字符串项,已忽略该项");
 			}
 		}
 
 		return result.ToArray();
+	}
+
+	private static SemVer? ReadOptionalSemVer(
+		Dictionary<string, JsonElement> properties, string field, List<string> errors, string? path = null)
+	{
+		if (!properties.TryGetValue(field, out var element))
+		{
+			return null;
+		}
+
+		if (element.ValueKind == JsonValueKind.String &&
+			SemVer.TryParse(element.GetString(), out var parsed))
+		{
+			return parsed;
+		}
+
+		errors.Add(FormatVersionError(PathLabel(path ?? "", field),
+			element.ValueKind == JsonValueKind.String ? element.GetString() ?? "" : "(非字符串)"));
+		return null;
 	}
 
 	private static string? GetOptionalString(Dictionary<string, JsonElement> properties, string field)
@@ -509,6 +532,9 @@ public static class ModManifestReader
 		var value = element.GetString();
 		return string.IsNullOrEmpty(value) ? null : value;
 	}
+
+	private static bool HasField(Dictionary<string, JsonElement> properties, string field) =>
+		properties.ContainsKey(field);
 
 	private static bool TryGetRequiredString(
 		Dictionary<string, JsonElement> properties,
@@ -563,6 +589,8 @@ public static class ModManifestReader
 		return true;
 	}
 
+	private static string DefaultName(string uid) => uid.Split('.')[^1];
+
 	private static string FormatVersionError(string field, string text)
 	{
 		var hint = text.IndexOfAny(['<', '>', '^', '~', '*', ',', ' ']) >= 0
@@ -574,7 +602,8 @@ public static class ModManifestReader
 	private static bool IsValidUid(string uid) =>
 		System.Text.RegularExpressions.Regex.IsMatch(uid, UidPattern);
 
-	private static bool IsValidAssemblyName(string name) =>
+	private static bool IsValidAssemblyName(string? name) =>
+		name is not null &&
 		name.EndsWith(".dll", StringComparison.OrdinalIgnoreCase) &&
 		name.IndexOfAny(['/', '\\']) < 0 &&
 		IsValidRelativePath(name);

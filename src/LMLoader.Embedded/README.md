@@ -15,8 +15,7 @@ public override void _Ready()
 
 引导节点延迟入树(Godot 惯例),加载异步完成,结果经 `BootCompleted` 事件通知。
 
-模组放置于游戏目录 `mods/`(或通过 `loader.ModsRootOverride` 指定),每个模组含 `*.mod.json` 清单、
-模组 DLL 与可选 pck。规范见仓库 `docs/mod-json-schema.md`。
+模组放置于游戏目录 `mods/`(或通过 `loader.ModsRootOverride` 指定),每个模组目录含一份 `*.mod.json` 清单(可并列声明多个模组)与清单声明的 DLL、pck。规范见仓库 `docs/mod-json-schema.md`。
 
 ## 运行期访问
 

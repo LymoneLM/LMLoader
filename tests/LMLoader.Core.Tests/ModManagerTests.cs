@@ -15,29 +15,18 @@ public class ModManagerTests : IDisposable
 		}
 		""";
 
-	private const string ModuleSourceTemplate = """
+	private const string ModSourceTemplate = """
 		using System;
 		using LMLoader.Api;
 
 		namespace Fixture;
 
-		public class #CLASS# : LmModule
+		[LmMod("#UID#")]
+		public class #CLASS# : LmMod
 		{
 		    public static System.Collections.Generic.List<string> Calls => CallRecorder.Items;
 
 		    public override void OnLoad() { #LOAD# }
-		}
-		""";
-
-	private const string ManifestTemplate = """
-		{
-		  "schemaVersion": 1,
-		  "uid": "#UID#",
-		  "name": "#UID#",
-		  "version": "1.0.0",
-		  "gameId": "#GAMEID#",
-		  "loaderVersion": "#LOADER#",
-		  "entry": { "assembly": "#ASM#.dll", "modules": [ { "uid": "#UID#.main", "type": "Fixture.#CLASS#", "depends": #DEPS# } ]#EXTRA# }
 		}
 		""";
 
@@ -68,22 +57,31 @@ public class ModManagerTests : IDisposable
 
 		var recorderDll = TestCompiler.CompileToDirectory(dir, "CallRecorderLib", RecorderSource);
 		var className = "M_" + uid.Replace('.', '_').Replace('-', '_');
-		var source = ModuleSourceTemplate
+		var source = ModSourceTemplate
+			.Replace("#UID#", uid)
 			.Replace("#CLASS#", className)
 			.Replace("#LOAD#", loadStatement);
-		TestCompiler.CompileToDirectory(dir, className + "Asm", source, recorderDll, typeof(LmModule).Assembly.Location);
+		TestCompiler.CompileToDirectory(dir, className + "Asm", source, recorderDll, typeof(LmMod).Assembly.Location);
 
 		var deps = depends is null || depends.Length == 0
 			? "[]"
-			: "[" + string.Join(", ", depends.Select(d => $$"""{ "uid": "{{d.Uid}}.main", "soft": {{(d.Soft ? "true" : "false").ToString().ToLowerInvariant()}}}""")) + "]";
-		var json = ManifestTemplate
-			.Replace("#UID#", uid)
-			.Replace("#GAMEID#", gameId)
-			.Replace("#LOADER#", loaderVersion)
-			.Replace("#ASM#", className + "Asm")
-			.Replace("#CLASS#", className)
-			.Replace("#DEPS#", deps)
-			.Replace("#EXTRA#", extraJson);
+			: "[" + string.Join(", ", depends.Select(d => $$"""{ "uid": "{{d.Uid}}", "soft": {{(d.Soft ? "true" : "false").ToString().ToLowerInvariant()}}}""")) + "]";
+
+		// 文件级声明块(gameId/loaderVersion 缺省 = 显式省略,D18 语义)
+		var fields = new List<string> { "\"schemaVersion\": 1" };
+		if (gameId.Length > 0)
+		{
+			fields.Add($"\"gameId\": \"{gameId}\"");
+		}
+
+		if (loaderVersion.Length > 0)
+		{
+			fields.Add($"\"loaderVersion\": \"{loaderVersion}\"");
+		}
+
+		fields.Add("\"version\": \"1.0.0\"");
+		var mods = $$"""{ "uid": "{{uid}}", "assemblies": ["{{className}}Asm.dll"], "depends": {{deps}} }""";
+		var json = "{\n  " + string.Join(",\n  ", fields) + ",\n  \"mods\": [" + mods + "]" + extraJson + "\n}";
 		File.WriteAllText(Path.Combine(dir, uid + ".mod.json"), json);
 
 		return dir;
@@ -136,9 +134,22 @@ public class ModManagerTests : IDisposable
 
 	[Trait("Category", "UsesFileSystem")]
 	[Fact]
+	public void gameId缺省_通用模组_任何宿主可装载_D18()
+	{
+		CreateMod("com.t.universal", "", gameId: "");
+		using var manager = CreateManager();
+
+		var result = manager.LoadAll();
+
+		Assert.Single(result.LoadedManifests);
+		Assert.Equal(1, result.Lifecycle!.SucceededCount);
+	}
+
+	[Trait("Category", "UsesFileSystem")]
+	[Fact]
 	public void 清单损坏_失败行_其余模组正常加载()
 	{
-		var goodDir = CreateMod("com.t.good", @"CallRecorder.Items.Add(""good:load"");");
+		CreateMod("com.t.good", @"CallRecorder.Items.Add(""good:load"");");
 		var badDir = Path.Combine(_root, "mods", "com.t.corrupt");
 		Directory.CreateDirectory(badDir);
 		File.WriteAllText(Path.Combine(badDir, "corrupt.mod.json"), "{ schemaVersion: ");
@@ -151,7 +162,7 @@ public class ModManagerTests : IDisposable
 		Assert.NotNull(result.Lifecycle);
 		Assert.Equal(1, result.Lifecycle.SucceededCount);
 		Assert.Contains("JSON 解析失败", result.SummaryText);
-		Assert.Contains("com.t.good.main", result.SummaryText);
+		Assert.Contains("com.t.good", result.SummaryText);
 	}
 
 	[Trait("Category", "UsesFileSystem")]
@@ -169,6 +180,19 @@ public class ModManagerTests : IDisposable
 
 	[Trait("Category", "UsesFileSystem")]
 	[Fact]
+	public void loaderVersion缺省_按当前API主版本接受_D18()
+	{
+		CreateMod("com.t.defaulted", "", loaderVersion: "");
+		using var manager = CreateManager();
+
+		var result = manager.LoadAll();
+
+		Assert.Single(result.LoadedManifests);
+		Assert.Equal(1, result.Lifecycle!.SucceededCount);
+	}
+
+	[Trait("Category", "UsesFileSystem")]
+	[Fact]
 	public void loaderVersion区间声明_命中通过_未命中拒载()
 	{
 		// ^1.0.0 应命中当前 API 1.0.0 基线
@@ -178,14 +202,14 @@ public class ModManagerTests : IDisposable
 		var result = manager.LoadAll();
 
 		var single = Assert.Single(result.LoadedManifests);
-		Assert.Equal("com.t.ranged", single.Uid);
+		Assert.Equal("com.t.ranged", single.Mods[0].Uid);
 
 		// 未命中:区间原文进汇总(目录里仍有命中区间的 com.t.ranged,它存活)
 		CreateMod("com.t.ranged2", "", loaderVersion: "^2.0.0");
 		var result2 = manager.LoadAll();
 
 		var survivor = Assert.Single(result2.LoadedManifests);
-		Assert.Equal("com.t.ranged", survivor.Uid);
+		Assert.Equal("com.t.ranged", survivor.Mods[0].Uid);
 		Assert.Contains("loaderVersion 不满足", result2.SummaryText);
 		Assert.Contains("^2.0.0", result2.SummaryText);
 	}
@@ -216,7 +240,41 @@ public class ModManagerTests : IDisposable
 		Assert.Null(result.Lifecycle);
 		Assert.True(result.Plan.BatchRejected);
 		Assert.Contains("整批拒绝", result.SummaryText);
-		Assert.Contains("com.t.a.main", result.Plan.BatchRejectReason);
+		Assert.Contains("com.t.a", result.Plan.BatchRejectReason);
+	}
+
+	[Trait("Category", "UsesFileSystem")]
+	[Fact]
+	public void 同uid副本_主根优先_附加根副本按模组跳过_D18()
+	{
+		CreateMod("com.t.dup", @"CallRecorder.Items.Add(""main:load"");");
+		// 附加根提供同 uid 副本(完整可用):规划期按模组粒度让位,主根照常
+		var additionalRoot = Path.Combine(_root, "workshop");
+		var dupDir = Path.Combine(additionalRoot, "com.t.dup");
+		Directory.CreateDirectory(dupDir);
+		var recorderDll = TestCompiler.CompileToDirectory(dupDir, "CallRecorderLib", RecorderSource);
+		var source = ModSourceTemplate
+			.Replace("#UID#", "com.t.dup")
+			.Replace("#CLASS#", "M_dupB")
+			.Replace("#LOAD#", @"CallRecorder.Items.Add(""dup:load"");");
+		TestCompiler.CompileToDirectory(dupDir, "M_dupBAsm", source, recorderDll, typeof(LmMod).Assembly.Location);
+		File.WriteAllText(Path.Combine(dupDir, "com.t.dup.mod.json"),
+			"""{ "schemaVersion": 1, "version": "1.0.0", "mods": [ { "uid": "com.t.dup", "assemblies": ["M_dupBAsm.dll"] } ] }""");
+
+		var options = new LoaderOptions
+		{
+			ModsRootPath = Path.Combine(_root, "mods"),
+			AdditionalModsRoots = [additionalRoot],
+			GameId = "com.game.test",
+			ApiVersion = new Version(1, 0, 0, 0),
+		};
+		using var manager = new ModManager(options);
+		var result = manager.LoadAll();
+
+		var instance = result.Lifecycle!.Results.Single(r => r.Uid == "com.t.dup").Instance!;
+		var calls = (List<string>)instance.GetType().GetProperty("Calls")!.GetValue(null)!;
+		Assert.Equal(["main:load"], calls); // 主根副本胜出
+		Assert.Contains(result.Plan.Skipped, s => s.Uid == "com.t.dup" && s.Reason.Contains("主根优先"));
 	}
 
 	[Trait("Category", "UsesFileSystem")]
@@ -238,7 +296,7 @@ public class ModManagerTests : IDisposable
 		var result = manager.LoadAll();
 
 		Assert.NotNull(seen);
-		Assert.Equal(["com.t.hello.main"], seen!.Ordered.Select(m => m.ModuleUid));
+		Assert.Equal(["com.t.hello"], seen!.Ordered.Select(m => m.Uid));
 
 		// 回调先于生命周期:管线保证;此处验证回调后加载仍完整
 		Assert.NotNull(result.Lifecycle);
@@ -281,23 +339,19 @@ public class ModManagerTests : IDisposable
 		var deepDir = Path.Combine(_root, "mods", "workshop", "123456", "654321");
 		Directory.CreateDirectory(deepDir);
 		var recorderDll = TestCompiler.CompileToDirectory(deepDir, "CallRecorderLib", RecorderSource);
-		var source = ModuleSourceTemplate.Replace("#CLASS#", "DeepMod").Replace("#LOAD#", "");
-		TestCompiler.CompileToDirectory(deepDir, "DeepAsm", source, recorderDll, typeof(LmModule).Assembly.Location);
-		var json = ManifestTemplate
+		var source = ModSourceTemplate
 			.Replace("#UID#", "com.t.deep")
-			.Replace("#GAMEID#", "com.game.test")
-			.Replace("#LOADER#", "1.0.0")
-			.Replace("#ASM#", "DeepAsm")
 			.Replace("#CLASS#", "DeepMod")
-			.Replace("#DEPS#", "[]")
-			.Replace("#EXTRA#", "");
-		File.WriteAllText(Path.Combine(deepDir, "deep.mod.json"), json);
+			.Replace("#LOAD#", "");
+		TestCompiler.CompileToDirectory(deepDir, "DeepAsm", source, recorderDll, typeof(LmMod).Assembly.Location);
+		File.WriteAllText(Path.Combine(deepDir, "deep.mod.json"),
+			"""{ "schemaVersion": 1, "gameId": "com.game.test", "version": "1.0.0", "mods": [ { "uid": "com.t.deep", "assemblies": ["DeepAsm.dll"] } ] }""");
 
 		using var manager = CreateManager();
 
 		var result = manager.LoadAll();
 
 		Assert.Single(result.LoadedManifests);
-		Assert.Equal("com.t.deep", result.LoadedManifests[0].Uid);
+		Assert.Equal("com.t.deep", result.LoadedManifests[0].Mods[0].Uid);
 	}
 }
