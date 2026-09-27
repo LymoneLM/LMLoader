@@ -6,6 +6,7 @@ using LMLoader.Api;
 using LMLoader.Core;
 using LMLoader.Core.Lifecycle;
 using LMLoader.Core.Logging;
+using LMLoader.Core.Management;
 using LMLoader.GodotBridge.Logging;
 using LMLoader.GodotBridge.PckMounting;
 using LMLoader.GodotBridge.SceneTreeEvents;
@@ -55,10 +56,20 @@ public partial class LMLoaderAutoload : Node
 	/// <summary>配置协调器;未引导或未启用配置时为 null(热重载已随引导开启)。</summary>
 	public LMLoader.Core.Config.ConfigManager? Configs => _modManager?.Configs;
 
+	/// <summary>
+	/// 模组启停状态变更通知(D19):开关写入持久化后触发。**重启时机与方式由游戏决定**
+	/// (保存→退出→重新启动进程);同进程重跑加载不构成重启。
+	/// </summary>
+	public event Action<ModStateChangeEventArgs>? ModStateChanged;
+
+	/// <summary>启停状态变更后、下次进程启动前为 true(尚未引导时为 false)。</summary>
+	public bool PendingRestart => _modManager?.PendingRestart ?? false;
+
 	private Node? _modsMountRoot;
 	private bool _booted;
 	private RingBufferLogSink? _logBuffer;
 	private LMLoader.UI.LmLogWindow? _logWindow;
+	private LMLoader.UI.LmModManagerWindow? _modManagerWindow;
 	private string? _summaryForWindow;
 
 	/// <summary>
@@ -121,7 +132,10 @@ public partial class LMLoaderAutoload : Node
 			GameAssemblyResolver = GameAssemblyResolver,
 			AfterPlan = plan => PckMounter.MountInPlanOrder(plan, logger),
 			ConfigRootPath = ProjectSettings.GlobalizePath("user://configs"), // Steam 环境游戏目录不可写,配置必须落 user://
+			ModStatePath = ProjectSettings.GlobalizePath("user://mod-state.toml"), // D19:启停状态与配置平级独立
 		}, router);
+
+		_modManager.ModStateChanged += e => ModStateChanged?.Invoke(e);
 
 		LastLoadResult = _modManager.LoadAll();
 		_summaryForWindow = LastLoadResult.SummaryText;
@@ -138,6 +152,28 @@ public partial class LMLoaderAutoload : Node
 		{
 			OpenLogWindow();
 		}
+	}
+
+	/// <summary>最近一次加载的发现视图(含被禁用模组;管理窗口数据源)。</summary>
+	public IReadOnlyList<DiscoveredMod> GetDiscoveredMods() =>
+		_modManager?.GetDiscoveredMods() ?? Array.Empty<DiscoveredMod>();
+
+	/// <summary>打开或切换模组管理窗口(启停开关/依赖警告/重启提示;D19)。</summary>
+	public void OpenModManager()
+	{
+		if (_modManagerWindow is not null)
+		{
+			_modManagerWindow.Visible = !_modManagerWindow.Visible;
+			return;
+		}
+
+		if (_modManager is null)
+		{
+			return; // 未引导(未入树),无管理对象
+		}
+
+		_modManagerWindow = new LMLoader.UI.LmModManagerWindow(_modManager);
+		AddChild(_modManagerWindow);
 	}
 
 	/// <summary>打开或切换日志窗口(分级查看 + 加载汇总报告);数据源为本 loader 的环形缓冲。</summary>
