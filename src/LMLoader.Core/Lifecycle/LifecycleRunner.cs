@@ -60,6 +60,8 @@ public sealed class LifecycleRunner
 		var stopwatch = System.Diagnostics.Stopwatch.StartNew();
 		var loaderLogger = _loggerRouter.GetLogger(LoaderLogUid);
 		_modConfigs.Clear();
+		_typesByUid.Clear();       // 防御:重复 Execute 不残留上次扫描登记(产品路径每次 LoadAll 新建 runner)
+		_bindingWarnings.Clear();
 		var states = plan.Ordered.Select(item => new RunState(item)).ToArray();
 
 		var hardDependents = BuildHardDependents(states);

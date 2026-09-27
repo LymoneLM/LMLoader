@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: LGPL-3.0-or-later
+﻿// SPDX-License-Identifier: LGPL-3.0-or-later
 
 using System.Text.Json;
 using LMLoader.Core.Versioning;
@@ -206,11 +206,12 @@ public static class ModManifestReader
 			}
 
 			var name = GetOptionalString(mod, "name") ?? fileName ?? DefaultName(uid);
-			var authors = HasField(mod, "authors") ? ReadStringArray(mod, "authors", warnings, path) : fileAuthors;
+			// 继承覆盖:模组级声明合法才覆盖;类型错误(非数组)警告后回退文件级,避免"错误声明以空值覆盖继承"
+			var authors = ReadOverrideArray(mod, "authors", path, warnings) ?? fileAuthors;
 			var description = GetOptionalString(mod, "description") ?? fileDescription;
 			var icon = GetOptionalString(mod, "icon") ?? fileIcon;
 			var website = GetOptionalString(mod, "website") ?? fileWebsite;
-			var tags = HasField(mod, "tags") ? ReadStringArray(mod, "tags", warnings, path) : fileTags;
+			var tags = ReadOverrideArray(mod, "tags", path, warnings) ?? fileTags;
 
 			// ---- assemblies(可选:缺省 = 纯资源/依赖锚模组) ----
 			var assemblies = Array.Empty<string>();
@@ -503,6 +504,27 @@ public static class ModManifestReader
 		return result.ToArray();
 	}
 
+	/// <summary>读模组级继承覆盖字段:未声明或类型错误(警告)返回 null → 调用方回退文件级继承。</summary>
+	private static string[]? ReadOverrideArray(
+		Dictionary<string, JsonElement> properties,
+		string field,
+		string? path,
+		List<string> warnings)
+	{
+		if (!properties.TryGetValue(field, out var element))
+		{
+			return null;
+		}
+
+		if (element.ValueKind != JsonValueKind.Array)
+		{
+			warnings.Add($"{PathLabel(path ?? "", field)}: 应为数组,已忽略(回退文件级继承)");
+			return null;
+		}
+
+		return ReadStringArray(properties, field, warnings, path);
+	}
+
 	private static SemVer? ReadOptionalSemVer(
 		Dictionary<string, JsonElement> properties, string field, List<string> errors, string? path = null)
 	{
@@ -532,9 +554,6 @@ public static class ModManifestReader
 		var value = element.GetString();
 		return string.IsNullOrEmpty(value) ? null : value;
 	}
-
-	private static bool HasField(Dictionary<string, JsonElement> properties, string field) =>
-		properties.ContainsKey(field);
 
 	private static bool TryGetRequiredString(
 		Dictionary<string, JsonElement> properties,
