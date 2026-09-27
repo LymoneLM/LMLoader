@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: LGPL-3.0-or-later
+﻿// SPDX-License-Identifier: LGPL-3.0-or-later
 
 using System.Reflection;
 using Godot;
@@ -36,8 +36,10 @@ public partial class LMLoaderAutoload : Node
 	public Version? ApiVersion { get; set; }
 
 	/// <summary>
-	/// 游戏程序集解析器(游戏程序集在宿主自身 ALC;模组要 patch 游戏方法时必需)。
-	/// 嵌入模式典型实现:<c>n => n.Name == "我的游戏程序集名" ? typeof(入口类型).Assembly : null</c>。入树前设置。
+	/// 游戏程序集解析器(游戏程序集装在 Godot 自身 ALC,模组 ALC 按名不可达)。
+	/// 经 <see cref="LMLoader.Embedded.LMLoaderEmbedded.Initialize"/> 接入时缺省解析调用方程序集
+	/// (典型即游戏程序集,零配置);手工构造引导节点或需精确控制时显式覆盖:
+	/// <c>n => n.Name == "我的游戏程序集名" ? typeof(入口类型).Assembly : null</c>。入树前设置。
 	/// </summary>
 	public Func<AssemblyName, Assembly?>? GameAssemblyResolver { get; set; }
 

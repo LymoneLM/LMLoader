@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: LGPL-3.0-or-later
+﻿// SPDX-License-Identifier: LGPL-3.0-or-later
 
 using Godot;
 using LMLoader.Api;
@@ -25,13 +25,13 @@ public partial class Main : Node
 
 	public override void _Ready()
 	{
-		// 一行接入;能力经 loader 节点访问
+		// 一行接入;能力经 loader 节点访问。
+		// GameAssemblyResolver 未设置:Initialize 自动解析调用方程序集(典型游戏零配置);
+		// 多程序集游戏才需要显式覆盖:n => n.Name == "你的程序集名" ? typeof(入口).Assembly : null
 		var loader = LMLoaderEmbedded.Initialize(GetTree(), l =>
 		{
 			l.GameId = "com.lmloader.samplegame";
 			l.ApiVersion = new Version(1, 0, 0); // 样例自定基线;缺省取 LMLoader.Api 程序集版本
-			// 游戏程序集在宿主自身 ALC,须按名显式供给模组(嵌入模式由入口程序集自供)
-			l.GameAssemblyResolver = n => n.Name == "SampleGame.Embedded" ? typeof(Main).Assembly : null;
 		});
 
 		loader.BootCompleted += () =>
