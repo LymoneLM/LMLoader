@@ -56,4 +56,10 @@ public sealed class LoaderOptions
 	/// Steam 环境游戏目录不可写,user:// 是硬约束),Core 不感知 user:// 语义。
 	/// </summary>
 	public string? ConfigRootPath { get; init; }
+
+	/// <summary>
+	/// 模组启停状态文件路径(D19,<c>user://mod-state.toml</c> 的全局化路径;与模组配置平级独立)。
+	/// null = 状态不持久化(内存态,重启即复位;过滤逻辑不变,缺省全启用故无行为差异)。
+	/// </summary>
+	public string? ModStatePath { get; init; }
 }

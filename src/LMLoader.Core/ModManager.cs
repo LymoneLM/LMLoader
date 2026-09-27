@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: LGPL-3.0-or-later
+﻿// SPDX-License-Identifier: LGPL-3.0-or-later
 
 using System.Reflection;
 using LMLoader.Api;
@@ -7,20 +7,32 @@ using LMLoader.Core.Lifecycle;
 using LMLoader.Core.Loading;
 using LMLoader.Core.Logging;
 using LMLoader.Core.Manifest;
+using LMLoader.Core.Management;
 using LMLoader.Core.Reporting;
 using LMLoader.Core.Versioning;
 
 namespace LMLoader.Core;
 
 /// <summary>
-/// 加载器门面:扫描 mods 目录 → 读取 mod.json → 过滤(gameId/loaderVersion) → 依赖规划 →
-/// 生命周期执行 → 人可读汇总(模组级失败一律记录不抛出;loader 配置错误直接抛异常)。
+/// 加载器门面:扫描 mods 目录 → 读取 mod.json → 过滤(gameId/loaderVersion) → 启停状态过滤(D19) →
+/// 依赖规划 → 生命周期执行 → 人可读汇总(模组级失败一律记录不抛出;loader 配置错误直接抛异常)。
+/// 管理面(D19):枚举发现视图 / 启停开关(即时持久化,重启进程生效)/ 状态变更事件 /
+/// 依赖预计算;重启时机与方式由宿主决定。
 /// </summary>
 public sealed class ModManager : IDisposable
 {
 	private readonly LoaderOptions _options;
 	private readonly ModAssemblyLoader _assemblyLoader;
 	private readonly Config.ConfigManager? _configManager;
+	private readonly ModStateStore? _stateStore;
+
+	/// <summary>启停状态(内存态);持久化经由 <see cref="_stateStore"/>(未配置路径则重启复位)。</summary>
+	private readonly ModState _state = new();
+
+	/// <summary>上次 LoadAll 实际消费的状态快照(供 PendingRestart 判定);null = 尚未加载。</summary>
+	private ModState? _appliedState;
+
+	private LoadResult? _lastResult;
 
 	/// <summary>日志中枢;宿主可自行增加 sink。</summary>
 	public LoggerRouter LoggerRouter { get; }
@@ -30,6 +42,18 @@ public sealed class ModManager : IDisposable
 
 	/// <summary>配置协调器;未配置 ConfigRootPath 时为 null(热重载由此驱动)。</summary>
 	public Config.ConfigManager? Configs => _configManager;
+
+	/// <summary>
+	/// 启停状态变更通知(D19):开关写入持久化后触发。重启时机与方式由宿主决定
+	/// (进程重启;同进程重跑 LoadAll 是变相热切换,不受支持)。
+	/// </summary>
+	public event Action<ModStateChangeEventArgs>? ModStateChanged;
+
+	/// <summary>
+	/// 启停状态变更后、下次进程启动前为 true(状态与上次实际加载所消费的不一致);
+	/// 尚未执行过 LoadAll 时为 false(变更将在首次加载直接生效)。
+	/// </summary>
+	public bool PendingRestart => _appliedState is not null && !_state.SameAs(_appliedState);
 
 	public ModManager(LoaderOptions options, LoggerRouter? loggerRouter = null, ServiceRegistry? serviceRegistry = null)
 	{
@@ -57,9 +81,15 @@ public sealed class ModManager : IDisposable
 			: new Config.ConfigManager(
 				options.ConfigRootPath,
 				logger: LoggerRouter.GetLogger(LifecycleRunner.LoaderLogUid));
+
+		_stateStore = string.IsNullOrEmpty(options.ModStatePath)
+			? null
+			: new ModStateStore(options.ModStatePath, LoggerRouter.GetLogger(LifecycleRunner.LoaderLogUid));
+		_state = _stateStore?.Load() ?? new ModState();
 	}
 
-	/// <summary>执行完整加载流程;可重复调用(如重启前重新扫描),每次独立规划。</summary>
+	/// <summary>执行完整加载流程;可重复调用(每次独立规划)。注意:已加载的模组程序集不会因此释放,
+	/// 进程内二次加载不是"应用启停变更"的手段(D19)——变更以重启进程生效。</summary>
 	public LoadResult LoadAll()
 	{
 		if (!Directory.Exists(_options.ModsRootPath))
@@ -129,8 +159,10 @@ public sealed class ModManager : IDisposable
 
 		loaderLogger.Info($"发现 {manifests.Count} 份有效模组清单(失败 {manifestFailures.Count} 份)");
 
-		// ---- 4. 依赖规划(uid 冲突在模组粒度处理:主根优先,同文件重复双拒) ----
-		var plan = DependencyPlanner.Plan(manifests);
+		// ---- 4. 启停状态过滤 + 依赖规划(D19:禁用模组不进依赖图,级联原因链指明) ----
+		var disabledReasons = BuildDisabledReasons(manifests);
+		var plan = DependencyPlanner.Plan(manifests, disabledReasons);
+		_appliedState = _state.Clone();
 
 		// ---- 5. 生命周期(整批拒绝时跳过;规划后回调供宿主挂载 pck 等资源) ----
 		LifecycleReport? lifecycle = null;
@@ -152,14 +184,202 @@ public sealed class ModManager : IDisposable
 
 		loaderLogger.Info(Environment.NewLine + summary);
 
-		return new LoadResult
+		_lastResult = new LoadResult
 		{
 			LoadedManifests = manifests,
 			ReadWarnings = readWarnings,
 			Plan = plan,
 			Lifecycle = lifecycle,
+			DiscoveredMods = BuildDiscoveredMods(manifests, plan, lifecycle, disabledReasons),
 			SummaryText = summary,
 		};
+		return _lastResult;
+	}
+
+	/// <summary>最近一次 LoadAll 的发现视图(含被禁用模组);尚未加载返回空。</summary>
+	public IReadOnlyList<DiscoveredMod> GetDiscoveredMods() =>
+		_lastResult?.DiscoveredMods ?? Array.Empty<DiscoveredMod>();
+
+	/// <summary>当前全局总开关值(D19,管理 UI 数据源;变更经 SetAllEnabled)。</summary>
+	public bool GlobalEnabled => _state.GlobalEnabled;
+
+	/// <summary>
+	/// 设置单个模组启停(即时持久化 + 触发 <see cref="ModStateChanged"/>)。
+	/// 已是目标状态时为无操作;尚未加载过时允许预设任意 uid(首次加载即生效)。
+	/// </summary>
+	public void SetModEnabled(string uid, bool enabled)
+	{
+		ArgumentException.ThrowIfNullOrWhiteSpace(uid);
+
+		if (_lastResult is not null && _lastResult.DiscoveredMods.All(m => m.Uid != uid))
+		{
+			throw new KeyNotFoundException($"未发现模组 \"{uid}\",无法设置启停状态");
+		}
+
+		if (_state.IsEnabled(uid) == enabled)
+		{
+			return; // 无操作(未声明条目 = 启用,须与显式声明同等判定)
+		}
+
+		_state.SetMod(uid, enabled);
+		PersistAndNotify($"模组 \"{uid}\" 已{(enabled ? "启用" : "禁用")}");
+	}
+
+	/// <summary>设置全局总开关(D19 纯净模式):false = 所有模组不加载(排障用);即时持久化 + 触发事件。</summary>
+	public void SetAllEnabled(bool enabled)
+	{
+		if (_state.GlobalEnabled == enabled)
+		{
+			return;
+		}
+
+		_state.GlobalEnabled = enabled;
+		PersistAndNotify(enabled ? "模组已整体启用" : "模组已整体禁用(纯净模式)");
+	}
+
+	/// <summary>
+	/// 依赖预计算(D19):禁用 <paramref name="uid"/> 后,因硬依赖缺失而无法加载的传递依赖方
+	/// (仅统计当前启用者;已被禁用的依赖方不在影响面内)。数据来自最近一次 LoadAll;未加载返回空。
+	/// </summary>
+	public IReadOnlyList<DependentImpact> PreviewDisable(string uid)
+	{
+		ArgumentException.ThrowIfNullOrWhiteSpace(uid);
+		if (_lastResult is null || !_state.IsEnabled(uid))
+		{
+			return Array.Empty<DependentImpact>();
+		}
+
+		var entryByName = new Dictionary<string, (ModEntry Entry, ModManifest Manifest)>(StringComparer.Ordinal);
+		var reverseHardDeps = new Dictionary<string, List<string>>(StringComparer.Ordinal);
+		foreach (var manifest in _lastResult.LoadedManifests)
+		{
+			foreach (var entry in manifest.Mods)
+			{
+				entryByName.TryAdd(entry.Uid, (entry, manifest));
+				foreach (var dependency in entry.Depends.Where(d => !d.Soft))
+				{
+					if (!reverseHardDeps.TryGetValue(dependency.Uid, out var list))
+					{
+						reverseHardDeps[dependency.Uid] = list = new List<string>();
+					}
+
+					list.Add(entry.Uid);
+				}
+			}
+		}
+
+		// BFS 沿"硬依赖方"边传播;已禁用者不在影响面(其本就无法加载),也不继续穿行
+		var impacts = new List<DependentImpact>();
+		var visited = new HashSet<string>(StringComparer.Ordinal) { uid };
+		var queue = new Queue<(string Uid, string Chain)>();
+		queue.Enqueue((uid, uid));
+		while (queue.Count > 0)
+		{
+			var (current, chain) = queue.Dequeue();
+			if (!reverseHardDeps.TryGetValue(current, out var dependents))
+			{
+				continue;
+			}
+
+			foreach (var dependent in dependents.OrderBy(d => d, StringComparer.Ordinal))
+			{
+				if (!visited.Add(dependent) || !_state.IsEnabled(dependent))
+				{
+					continue;
+				}
+
+				var impactChain = $"{chain} ← {dependent}";
+				var (entry, _) = entryByName[dependent];
+				impacts.Add(new DependentImpact(dependent, entry.Name, impactChain));
+				queue.Enqueue((dependent, impactChain));
+			}
+		}
+
+		return impacts;
+	}
+
+	/// <summary>构建禁用原因表:全局关闭 → 全部模组;否则仅显式禁用者。孤儿键(未发现的 uid)自然落空。</summary>
+	private Dictionary<string, string> BuildDisabledReasons(List<ModManifest> manifests)
+	{
+		var reasons = new Dictionary<string, string>(StringComparer.Ordinal);
+		if (!_state.GlobalEnabled)
+		{
+			foreach (var manifest in manifests)
+			{
+				foreach (var entry in manifest.Mods)
+				{
+					reasons[entry.Uid] = "全局开关已关闭,模组整体禁用(重启生效)";
+				}
+			}
+
+			return reasons;
+		}
+
+		foreach (var manifest in manifests)
+		{
+			foreach (var entry in manifest.Mods)
+			{
+				if (_state.Mods.TryGetValue(entry.Uid, out var enabled) && !enabled)
+				{
+					reasons[entry.Uid] = "已禁用(重启生效)";
+				}
+			}
+		}
+
+		return reasons;
+	}
+
+	private static IReadOnlyList<DiscoveredMod> BuildDiscoveredMods(
+		List<ModManifest> manifests,
+		LoadPlan plan,
+		LifecycleReport? lifecycle,
+		Dictionary<string, string> disabledReasons)
+	{
+		var lifecycleByUid = lifecycle?.Results.ToDictionary(r => r.Uid, StringComparer.Ordinal);
+		var skippedByUid = plan.Skipped
+			.GroupBy(s => s.Uid, StringComparer.Ordinal)
+			.ToDictionary(g => g.Key, g => g.First().Reason, StringComparer.Ordinal);
+
+		var result = new List<DiscoveredMod>();
+		foreach (var manifest in manifests)
+		{
+			foreach (var entry in manifest.Mods)
+			{
+				var (status, detail) = lifecycleByUid is not null && lifecycleByUid.TryGetValue(entry.Uid, out var run)
+					? run.FailedStage is not null
+						? (ModLoadStatus.Failed, $"{run.FailedStage}失败: {run.Exception?.Message}")
+						: run.Skipped ? (ModLoadStatus.Skipped, run.Note ?? "已跳过")
+						: run.Succeeded ? (ModLoadStatus.Loaded, run.Note ?? "")
+						: (ModLoadStatus.NotRun, run.Note ?? "未执行")
+					: skippedByUid.TryGetValue(entry.Uid, out var skipReason)
+						? (ModLoadStatus.Skipped, skipReason)
+						: (ModLoadStatus.NotRun, "未参与本次规划");
+
+				result.Add(new DiscoveredMod
+				{
+					Uid = entry.Uid,
+					Name = entry.Name,
+					Version = entry.Version.ToString(),
+					SourcePath = manifest.SourcePath,
+					Enabled = !disabledReasons.ContainsKey(entry.Uid),
+					Status = status,
+					Detail = detail,
+				});
+			}
+		}
+
+		return result;
+	}
+
+	private void PersistAndNotify(string summary)
+	{
+		_stateStore?.Save(_state);
+		ModStateChanged?.Invoke(new ModStateChangeEventArgs
+		{
+			GlobalEnabled = _state.GlobalEnabled,
+			DisabledUids = _state.Mods.Where(kv => !kv.Value).Select(kv => kv.Key).ToArray(),
+			Summary = summary + "(重启后生效)",
+		});
 	}
 
 	/// <summary>递归扫描 <c>*mod.json</c>;同目录多份清单只取字典序第一份并告警。</summary>
